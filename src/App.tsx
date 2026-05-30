@@ -65,6 +65,17 @@ const styleByCode = [
 const terrainToCode = new Map<TerrainType, number>(terrainByCode.map((type, code) => [type, code]));
 const landmarkToCode = new Map<LandmarkType, number>(landmarkByCode.map((type, code) => [type, code]));
 const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) => [type, code]));
+const EXPORT_MAP_ID = "southen-wood-lv1";
+
+const dungeonLandmarks = new Set<LandmarkType>([
+  LandmarkType.MAIN_DUNGEON,
+  LandmarkType.SUB_DUNGEON,
+]);
+
+const campLandmarks = new Set<LandmarkType>([
+  LandmarkType.MAIN_CAMP,
+  LandmarkType.SUB_CAMP,
+]);
 
 const getHexDistanceFromOrigin = (q: number, r: number) => {
   return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
@@ -325,16 +336,22 @@ export default function App() {
   const getCurrentJSON = (): string => {
     const exportCells = (Object.values(cells) as HexCell[]).filter((c) => c.terrain !== TerrainType.NONE);
     const exportData = {
-      generator: "Fantasy Hex Map Editor",
-      createdAt: new Date().toISOString(),
-      radius,
-      cellsCount: exportCells.length,
-      cells: exportCells.map((c) => ({
-        c: `${c.q},${c.r}`,
-        t: terrainToCode.get(c.terrain) ?? 0,
-        l: styleToCode.get(c.style) ?? 0,
-        f: landmarkToCode.get(c.landmark) ?? 0,
-      })),
+      id: EXPORT_MAP_ID,
+      world: {
+        radius,
+        tiles: exportCells.map((c) => ({
+          c: `${c.q},${c.r}`,
+          t: terrainToCode.get(c.terrain) ?? 0,
+          l: styleToCode.get(c.style) ?? 0,
+          f: landmarkToCode.get(c.landmark) ?? 0,
+        })),
+        dungeonCoords: exportCells
+          .filter((c) => dungeonLandmarks.has(c.landmark))
+          .map((c) => `${c.q},${c.r}`),
+        campCoords: exportCells
+          .filter((c) => campLandmarks.has(c.landmark))
+          .map((c) => `${c.q},${c.r}`),
+      },
     };
     return JSON.stringify(exportData, null, 2);
   };
@@ -357,7 +374,7 @@ export default function App() {
   const handleImportJSON = (jsonText: string): boolean => {
     try {
       const data = JSON.parse(jsonText);
-      const importedCells = Array.isArray(data) ? data : data.cells;
+      const importedCells = Array.isArray(data) ? data : data.world?.tiles ?? data.tiles ?? data.cells;
       if (!Array.isArray(importedCells)) {
         return false;
       }
@@ -403,7 +420,11 @@ export default function App() {
         return false;
       }
 
-      const nextRadius = typeof data.radius === "number" ? data.radius : inferredRadius;
+      const nextRadius = typeof data.world?.radius === "number"
+        ? data.world.radius
+        : typeof data.radius === "number"
+          ? data.radius
+          : inferredRadius;
       const nextCells = { ...createNoTerrainCells(nextRadius), ...incomingCells };
 
       setRadius(nextRadius);
