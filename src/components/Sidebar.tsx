@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { TerrainType, LandmarkType, StyleVariant, HexCell } from "../types";
+import { TerrainType, LandmarkType, StyleVariant } from "../types";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "../constants";
 import {
   Undo2,
@@ -16,9 +16,11 @@ import {
   MapPin,
   Sparkles,
   Layers,
+  ChevronDown,
   ChevronRight,
   Compass,
   FileCode,
+  BarChart3,
   Trash2,
   Copy,
   Check,
@@ -62,12 +64,50 @@ interface SidebarProps {
   // JSON Operations
   exportJSON: () => void;
   importJSON: (data: string) => boolean;
-  onClearMap: () => void;
+  terrainCounts: Record<TerrainType, number>;
   getCurrentJSON: () => string;
-
-  // Live coordinates display under mouse
-  hoveredCell: HexCell | null;
 }
+
+type SidebarGroupId = "mapAtlas" | "brush" | "history" | "stats" | "grid" | "json";
+
+interface CollapsibleGroupProps {
+  title: string;
+  icon: React.ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+const CollapsibleGroup: React.FC<CollapsibleGroupProps> = ({
+  title,
+  icon,
+  expanded,
+  onToggle,
+  children,
+}) => (
+  <section className="rounded-xl border border-slate-200/80 bg-slate-50/45 overflow-hidden shadow-sm shadow-slate-100/80">
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center justify-between gap-3 px-3.5 py-3 text-left hover:bg-slate-100/70 transition-colors border-b border-slate-200/70"
+    >
+      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+        {icon}
+        {title}
+      </span>
+      {expanded ? (
+        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+      ) : (
+        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+      )}
+    </button>
+    {expanded && (
+      <div className="px-3.5 pb-3.5 pt-3">
+        {children}
+      </div>
+    )}
+  </section>
+);
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeLayer,
@@ -92,9 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRenameMap,
   exportJSON,
   importJSON,
-  onClearMap,
+  terrainCounts,
   getCurrentJSON,
-  hoveredCell,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -102,6 +141,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [inputRadius, setInputRadius] = useState<number>(radius);
   const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
   const [copied, setCopied] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Record<SidebarGroupId, boolean>>({
+    mapAtlas: true,
+    brush: true,
+    history: true,
+    stats: true,
+    grid: true,
+    json: true,
+  });
+
+  const toggleGroup = (groupId: SidebarGroupId) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
 
   useEffect(() => {
     setInputRadius(radius);
@@ -191,14 +245,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Main Tools Container */}
-      <div className="p-5 flex-1 flex flex-col space-y-6">
+      <div className="p-5 flex-1 flex flex-col gap-4 divide-y divide-slate-200/80">
         {/* Map Atlas */}
-        <div className="space-y-3">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Map className="w-3.5 h-3.5 text-slate-400" />
-            地圖集
-          </span>
-
+        <CollapsibleGroup
+          title="地圖集"
+          icon={<Map className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.mapAtlas}
+          onToggle={() => toggleGroup("mapAtlas")}
+        >
           <div className="space-y-2">
             <select
               id="atlas-map-select"
@@ -227,7 +281,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }
                   }}
                   onBlur={() => {
-                    const nextName = mapNameInput.trim() || maps[selectedMapIndex]?.id || "map-1";
+                    const nextName = mapNameInput.trim() || maps[selectedMapIndex]?.id || "001";
                     setMapNameInput(nextName);
                     onRenameMap(nextName);
                   }}
@@ -260,73 +314,110 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </CollapsibleGroup>
+
+        {/* Custom Grid size (支援自定義格數) */}
+        <CollapsibleGroup
+          title="自定義地圖格數"
+          icon={<Grid className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.grid}
+          onToggle={() => toggleGroup("grid")}
+        >
+          <div className="space-y-3">
+            <form onSubmit={handleResizeSubmit} className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <input
+                  id="grid-radius-input"
+                  type="number"
+                  min="2"
+                  max="15"
+                  value={inputRadius}
+                  onChange={(e) => setInputRadius(Math.max(2, Math.min(15, parseInt(e.target.value) || 2)))}
+                  className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">層</span>
+              </div>
+              <button
+                id="grid-resize-btn"
+                type="submit"
+                className="py-1.5 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+              >
+                調整大小
+              </button>
+            </form>
+            <div className="text-[10px] text-slate-400 leading-relaxed">
+              * 縮小半徑會裁切外圍格子，放大則會保留當前內容並往外拓展。
+            </div>
+          </div>
+        </CollapsibleGroup>
 
         {/* Layer / Brush Modes */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-slate-400" />
-              編輯圖層與筆刷
-            </span>
+        <CollapsibleGroup
+          title="編輯圖層與筆刷"
+          icon={<Layers className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.brush}
+          onToggle={() => toggleGroup("brush")}
+        >
+          <div className="space-y-3">
             {activeLayer === "eraser" && (
-              <span className="text-[11px] font-medium bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-100 flex items-center gap-1">
-                <Eraser className="w-2.5 h-2.5" /> 橡皮擦模式
-              </span>
+              <div className="flex justify-end">
+                <span className="text-[11px] font-medium bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-100 flex items-center gap-1">
+                  <Eraser className="w-2.5 h-2.5" /> 橡皮擦模式
+                </span>
+              </div>
             )}
-          </div>
 
-          <div className="grid grid-cols-4 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
-            <button
-              id="layer-btn-terrain"
-              onClick={() => setActiveLayer("terrain")}
-              className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                activeLayer === "terrain"
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Grid className="w-4 h-4" />
-              <span>地形</span>
-            </button>
-            <button
-              id="layer-btn-landmark"
-              onClick={() => setActiveLayer("landmark")}
-              className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                activeLayer === "landmark"
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <MapPin className="w-4 h-4" />
-              <span>地標</span>
-            </button>
-            <button
-              id="layer-btn-style"
-              onClick={() => setActiveLayer("style")}
-              className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                activeLayer === "style"
-                  ? "bg-white text-indigo-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>風格</span>
-            </button>
-            <button
-              id="layer-btn-eraser"
-              onClick={() => setActiveLayer("eraser")}
-              className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                activeLayer === "eraser"
-                  ? "bg-rose-500 text-white shadow-inner"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Eraser className="w-4 h-4" />
-              <span>清除</span>
-            </button>
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+              <button
+                id="layer-btn-terrain"
+                onClick={() => setActiveLayer("terrain")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "terrain"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Grid className="w-4 h-4" />
+                <span>地形</span>
+              </button>
+              <button
+                id="layer-btn-landmark"
+                onClick={() => setActiveLayer("landmark")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "landmark"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <MapPin className="w-4 h-4" />
+                <span>地標</span>
+              </button>
+              <button
+                id="layer-btn-style"
+                onClick={() => setActiveLayer("style")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "style"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>風格</span>
+              </button>
+              <button
+                id="layer-btn-eraser"
+                onClick={() => setActiveLayer("eraser")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "eraser"
+                    ? "bg-rose-500 text-white shadow-inner"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Eraser className="w-4 h-4" />
+                <span>清除</span>
+              </button>
+            </div>
           </div>
-        </div>
 
         {/* Paint Item Selector */}
         <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-100">
@@ -363,21 +454,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     key={cfg.type}
                     onClick={() => setSelectedLandmark(cfg.type)}
-                    className={`w-full p-2 rounded-lg border text-left transition-all flex items-start gap-3 ${
+                    className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
                       selectedLandmark === cfg.type
                         ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
-                        : "bg-white/80 border-slate-200/80 hover:border-slate-300"
+                        : "bg-white/80 border-slate-200 hover:border-slate-300"
                     }`}
                   >
-                    <div className="p-2 bg-slate-100 rounded text-slate-600 border border-slate-200 shadow-sm shrink-0 mt-0.5">
-                      <span className="text-xs font-mono font-bold">{cfg.label[0]}</span>
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-800">{cfg.label}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
-                        {cfg.description}
+                    <div className="flex items-center gap-2">
+                      <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[9px] font-mono font-bold text-slate-600">
+                        {cfg.label[0]}
                       </div>
+                      <span className="text-xs font-medium text-slate-700">
+                        {cfg.label}
+                      </span>
                     </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                   </button>
                 ))}
               </div>
@@ -421,13 +512,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
         </div>
+        </CollapsibleGroup>
 
         {/* History Controls */}
-        <div className="space-y-2">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Undo2 className="w-3.5 h-3.5 text-slate-400" />
-            歷史記錄與復原
-          </span>
+        <CollapsibleGroup
+          title="歷史紀錄與還原"
+          icon={<Undo2 className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.history}
+          onToggle={() => toggleGroup("history")}
+        >
           <div className="grid grid-cols-2 gap-2">
             <button
               id="undo-btn"
@@ -456,48 +549,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>重做 (Redo)</span>
             </button>
           </div>
-        </div>
+        </CollapsibleGroup>
 
-        {/* Custom Grid size (支援自定義格數) */}
-        <div className="space-y-3">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <Grid className="w-3.5 h-3.5 text-slate-400" />
-            自定義地圖格數 (半徑)
-          </span>
-
-          <form onSubmit={handleResizeSubmit} className="flex gap-2 items-center">
-            <div className="relative flex-1">
-              <input
-                id="grid-radius-input"
-                type="number"
-                min="2"
-                max="15"
-                value={inputRadius}
-                onChange={(e) => setInputRadius(Math.max(2, Math.min(15, parseInt(e.target.value) || 2)))}
-                className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">層</span>
-            </div>
-            <button
-              id="grid-resize-btn"
-              type="submit"
-              className="py-1.5 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
-            >
-              調整大小
-            </button>
-          </form>
-          <div className="text-[10px] text-slate-400 leading-relaxed">
-            * 縮小半徑會裁切外圍格子，放大則會保留當前內容並往外拓展。
+        {/* Terrain Stats */}
+        <CollapsibleGroup
+          title="統計"
+          icon={<BarChart3 className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.stats}
+          onToggle={() => toggleGroup("stats")}
+        >
+          <div className="space-y-1.5">
+            {Object.values(TERRAIN_CONFIGS)
+              .filter((cfg) => cfg.type !== TerrainType.NONE)
+              .map((cfg) => (
+                <div
+                  key={cfg.type}
+                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white/80 px-3 py-2 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3.5 h-3.5 rounded border shadow-inner shrink-0"
+                      style={{ backgroundColor: cfg.color, borderColor: cfg.borderColor }}
+                    />
+                    <span className="font-medium text-slate-700">{cfg.label}</span>
+                  </div>
+                  <span className="font-mono font-bold text-indigo-600">
+                    {terrainCounts[cfg.type] ?? 0}
+                  </span>
+                </div>
+              ))}
           </div>
-        </div>
+        </CollapsibleGroup>
 
         {/* JSON Import & Export */}
-        <div className="space-y-3 pt-2">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-            <FileCode className="w-3.5 h-3.5 text-slate-400" />
-            存檔與匯出匯入 (JSON)
-          </span>
-
+        <CollapsibleGroup
+          title="存檔與匯出匯入"
+          icon={<FileCode className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.json}
+          onToggle={() => toggleGroup("json")}
+        >
+        <div className="space-y-3">
           {/* Drag & Drop Import zone */}
           <div
             id="json-dropzone"
@@ -562,57 +653,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         </div>
+        </CollapsibleGroup>
 
-      </div>
-
-      {/* Coordinate & Grid Inspector Panel */}
-      <div id="inspector-panel" className="p-4 bg-slate-50 border-t border-slate-100">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
-          當前格子座標探測
-        </span>
-        {hoveredCell ? (
-          <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm flex flex-col space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-indigo-600 font-mono">
-                Axial: ({hoveredCell.q}, {hoveredCell.r})
-              </span>
-              <span className="text-[10px] font-mono text-slate-400">
-                Cube: ({hoveredCell.q}, {hoveredCell.r}, {-hoveredCell.q - hoveredCell.r})
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 text-[10px]">地形:</span>
-                <span className="font-bold text-slate-700">{TERRAIN_CONFIGS[hoveredCell.terrain]?.label || hoveredCell.terrain}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 text-[10px]">地標:</span>
-                <span className="font-bold text-slate-700">{LANDMARK_CONFIGS[hoveredCell.landmark]?.label || hoveredCell.landmark}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
-              <span className="text-slate-400 text-[10px]">風格:</span>
-              <span className="font-semibold text-slate-700" style={{ color: STYLE_CONFIGS[hoveredCell.style]?.borderColor }}>
-                {STYLE_CONFIGS[hoveredCell.style]?.label}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
-            將滑鼠移至地圖上即可看見座標資訊
-          </div>
-        )}
-
-        <button
-          id="clear-all-btn"
-          onClick={onClearMap}
-          className="w-full mt-3 flex items-center justify-center gap-2 py-2 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg text-xs font-semibold transition-all border border-rose-100/50"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          <span>清除整張地圖</span>
-        </button>
       </div>
     </div>
   );

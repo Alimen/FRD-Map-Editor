@@ -7,13 +7,12 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { HexCell, TerrainType, LandmarkType, StyleVariant } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
-import { axialToPixel } from "./hexLayout";
+import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "./constants";
 import {
   ZoomIn,
   ZoomOut,
   HelpCircle,
-  Compass,
-  MousePointerClick
+  Compass
 } from "lucide-react";
 
 const createCells = (radius: number, terrain: TerrainType): Record<string, HexCell> => {
@@ -65,7 +64,8 @@ const styleByCode = [
 const terrainToCode = new Map<TerrainType, number>(terrainByCode.map((type, code) => [type, code]));
 const landmarkToCode = new Map<LandmarkType, number>(landmarkByCode.map((type, code) => [type, code]));
 const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) => [type, code]));
-const EXPORT_MAP_ID = "southen-wood-lv1";
+const formatMapId = (index: number) => index.toString().padStart(3, "0");
+const DEFAULT_MAP_ID = formatMapId(1);
 
 const dungeonLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_DUNGEON,
@@ -83,6 +83,14 @@ interface AtlasMap {
   cells: Record<string, HexCell>;
 }
 
+const getNextMapId = (maps: AtlasMap[]) => {
+  const nextIndex = maps.reduce((highest, map) => {
+    return /^\d+$/.test(map.id) ? Math.max(highest, Number(map.id)) : highest;
+  }, 0) + 1;
+
+  return formatMapId(nextIndex);
+};
+
 const getHexDistanceFromOrigin = (q: number, r: number) => {
   return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
 };
@@ -98,7 +106,7 @@ export default function App() {
   });
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
-      id: EXPORT_MAP_ID,
+      id: DEFAULT_MAP_ID,
       radius: 6,
       cells: createEmptyCells(6),
     },
@@ -128,7 +136,6 @@ export default function App() {
   // High performance painting states
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const strokeChangesRef = useRef<Record<string, HexCell> | null>(null);
-  const [showCoordinatesOverlay, setShowCoordinatesOverlay] = useState<boolean>(true);
   const [showDemoHelp, setShowDemoHelp] = useState<boolean>(true);
 
   const getMapsWithCurrentSnapshot = useCallback((): AtlasMap[] => {
@@ -196,9 +203,8 @@ export default function App() {
 
   const handleAddMap = () => {
     const nextMaps = getMapsWithCurrentSnapshot();
-    const nextMapNumber = nextMaps.length + 1;
     const nextMap: AtlasMap = {
-      id: `map-${nextMapNumber}`,
+      id: getNextMapId(nextMaps),
       radius: 6,
       cells: createEmptyCells(6),
     };
@@ -296,14 +302,6 @@ export default function App() {
     // Auto center map camera
     setPanX(0);
     setPanY(0);
-  };
-
-  // Reset/Clear Entire Map
-  const handleClearMap = () => {
-    const cleanCells = createEmptyCells(radius);
-    pushToHistory(cleanCells, radius);
-    setCells(cleanCells);
-    updateCurrentMapSnapshot(cleanCells, radius);
   };
 
   // Cell Painter logic
@@ -525,6 +523,20 @@ export default function App() {
     return JSON.stringify(exportData, null, 2);
   };
 
+  const terrainCounts = (Object.values(cells) as HexCell[]).reduce(
+    (counts, cell) => {
+      counts[cell.terrain] = (counts[cell.terrain] ?? 0) + 1;
+      return counts;
+    },
+    {
+      [TerrainType.NONE]: 0,
+      [TerrainType.PLAIN]: 0,
+      [TerrainType.HILL]: 0,
+      [TerrainType.MOUNTAIN]: 0,
+      [TerrainType.LOWLAND]: 0,
+    } as Record<TerrainType, number>
+  );
+
   // File download helper
   const handleExportJSON = () => {
     const jsonStr = getCurrentJSON();
@@ -545,8 +557,8 @@ export default function App() {
       const data = JSON.parse(jsonText);
       const isMapCollection = Array.isArray(data) && data.some((item) => item?.world || typeof item?.id === "string");
       const importedMaps = isMapCollection
-        ? data.map((item, index) => parseImportedMap(item, `map-${index + 1}`)).filter(Boolean) as AtlasMap[]
-        : [parseImportedMap(data, EXPORT_MAP_ID)].filter(Boolean) as AtlasMap[];
+        ? data.map((item, index) => parseImportedMap(item, formatMapId(index + 1))).filter(Boolean) as AtlasMap[]
+        : [parseImportedMap(data, DEFAULT_MAP_ID)].filter(Boolean) as AtlasMap[];
 
       if (importedMaps.length === 0) {
         return false;
@@ -596,9 +608,8 @@ export default function App() {
         onRenameMap={handleRenameMap}
         exportJSON={handleExportJSON}
         importJSON={handleImportJSON}
-        onClearMap={handleClearMap}
+        terrainCounts={terrainCounts}
         getCurrentJSON={getCurrentJSON}
-        hoveredCell={hoveredCell}
       />
 
       {/* Main Interactive Map Canvas Space */}
@@ -634,18 +645,6 @@ export default function App() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-sm p-1.5 rounded-xl border border-slate-200 shadow-lg shadow-slate-200/50">
-            <button
-              onClick={() => setShowCoordinatesOverlay((prev) => !prev)}
-              className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
-                showCoordinatesOverlay
-                  ? "bg-indigo-50 text-indigo-700"
-                  : "text-slate-500 hover:bg-slate-100"
-              }`}
-            >
-              格內座標 {showCoordinatesOverlay ? "顯示中" : "已隱藏"}
-            </button>
-          </div>
         </div>
 
         {/* Floating Quick Action Keys Panel (Top Right) */}
@@ -661,49 +660,78 @@ export default function App() {
 
         {/* Demo operational help alert popup */}
         {showDemoHelp && (
-          <div className="absolute bottom-4 right-4 z-20 max-w-sm bg-slate-900/95 backdrop-blur text-white p-4 rounded-xl shadow-xl border border-slate-700/80 text-xs">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                <Compass className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "12s" }} />
+          <div className="absolute bottom-4 right-4 z-20 max-w-sm bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-xl shadow-slate-200/40 border border-slate-200/80 text-xs text-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
+                  <Compass className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "12s" }} />
+                </span>
                 滑鼠探索與編輯捷徑
               </span>
               <button
                 onClick={() => setShowDemoHelp(false)}
-                className="text-slate-400 hover:text-white font-mono scale-110 px-1"
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 font-mono scale-110 px-1.5 py-0.5 rounded-md transition-colors"
               >
                 ×
               </button>
             </div>
-            <ul className="space-y-1.5 text-slate-300 leading-relaxed font-sans">
-              <li className="flex items-start gap-1.5">
-                <span className="text-amber-400">❶</span>
-                <span><strong>拖曳著色：</strong>按住滑鼠左鍵並行經格子，可快速連續刷上選取的屬性。</span>
+            <ul className="space-y-2 leading-relaxed font-sans">
+              <li className="flex items-start gap-2 rounded-lg bg-slate-50/70 border border-slate-100 px-3 py-2">
+                <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
+                <span><strong className="text-slate-800">拖曳著色：</strong>按住滑鼠左鍵並行經格子，可快速連續刷上選取的屬性。</span>
               </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-amber-400">❷</span>
-                <span><strong>視野平移：</strong>在空白處按住<strong>左鍵拖曳</strong>、按住<strong>中鍵滾輪</strong>，或使用<strong>右鍵拖曳</strong>，即可平移視圖。</span>
+              <li className="flex items-start gap-2 rounded-lg bg-slate-50/70 border border-slate-100 px-3 py-2">
+                <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>
+                <span><strong className="text-slate-800">視野平移：</strong>在空白處按住<strong>左鍵拖曳</strong>、按住<strong>中鍵滾輪</strong>，或使用<strong>右鍵拖曳</strong>，即可平移視圖。</span>
               </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-amber-400">❸</span>
-                <span><strong>滾輪縮放：</strong>在畫面上滑動滑鼠滾輪，便能直接放大縮小格線。</span>
+              <li className="flex items-start gap-2 rounded-lg bg-slate-50/70 border border-slate-100 px-3 py-2">
+                <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-[10px] font-bold shrink-0">3</span>
+                <span><strong className="text-slate-800">滾輪縮放：</strong>在畫面上滑動滑鼠滾輪，便能直接放大縮小格線。</span>
               </li>
             </ul>
           </div>
         )}
 
-        {/* Center Live Coordinates Floating Hub */}
-        <div id="live-coordinates-hub" className="absolute bottom-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl text-white border border-slate-700 shadow-xl font-mono text-xs flex items-center gap-3">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <MousePointerClick className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-slate-400 font-bold">探針座標:</span>
-          </div>
+        {/* Coordinate & Grid Inspector Panel */}
+        <div id="inspector-panel" className="absolute bottom-4 left-4 z-10 w-[min(22rem,calc(100%-2rem))] bg-white/95 backdrop-blur-sm p-4 rounded-xl border border-slate-200/80 shadow-xl shadow-slate-900/20 text-slate-700">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
+            當前格子座標探測
+          </span>
           {hoveredCell ? (
-            <span className="text-amber-400 font-bold text-sm tracking-wider">
-              q: {hoveredCell.q} , r: {hoveredCell.r}
-            </span>
+            <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm flex flex-col space-y-1.5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold text-indigo-600 font-mono">
+                  Axial: ({hoveredCell.q}, {hoveredCell.r})
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  Cube: ({hoveredCell.q}, {hoveredCell.r}, {-hoveredCell.q - hoveredCell.r})
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px]">地形:</span>
+                  <span className="font-bold text-slate-700">{TERRAIN_CONFIGS[hoveredCell.terrain]?.label || hoveredCell.terrain}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px]">地標:</span>
+                  <span className="font-bold text-slate-700">{LANDMARK_CONFIGS[hoveredCell.landmark]?.label || hoveredCell.landmark}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
+                <span className="text-slate-400 text-[10px]">風格:</span>
+                <span className="font-semibold text-slate-700" style={{ color: STYLE_CONFIGS[hoveredCell.style]?.borderColor }}>
+                  {STYLE_CONFIGS[hoveredCell.style]?.label}
+                </span>
+              </div>
+            </div>
           ) : (
-            <span className="text-slate-400 italic">置於格上以取得座標</span>
+            <div className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
+              將滑鼠移至地圖上即可看見座標資訊
+            </div>
           )}
+
         </div>
 
         {/* Interactive Workspace SVG Map Container */}
@@ -781,25 +809,6 @@ export default function App() {
                 );
               })}
 
-              {/* Dynamic Coordinate Text markers directly overlayed on grid centers */}
-              {showCoordinatesOverlay && (Object.values(cells) as HexCell[]).map((cell) => {
-                // Approximate coordinate label points
-                if (cell.terrain === TerrainType.NONE) return null;
-                if (cellSize < 30) return null; // Avoid overlapping text cluttered together when zoomed out
-                const { x: cx, y: cy } = axialToPixel(cell.q, cell.r, cellSize);
-
-                return (
-                  <text
-                    key={`coord-text-${cell.q}-${cell.r}`}
-                    x={cx}
-                    y={cy - cellSize * 0.52}
-                    textAnchor="middle"
-                    className="text-[9px] font-mono font-semibold fill-slate-800/25 pointer-events-none select-none tracking-tighter"
-                  >
-                    {cell.q},{cell.r}
-                  </text>
-                );
-              })}
             </g>
           </svg>
         </div>
