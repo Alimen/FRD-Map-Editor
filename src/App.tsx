@@ -77,6 +77,12 @@ const campLandmarks = new Set<LandmarkType>([
   LandmarkType.SUB_CAMP,
 ]);
 
+interface AtlasMap {
+  id: string;
+  radius: number;
+  cells: Record<string, HexCell>;
+}
+
 const getHexDistanceFromOrigin = (q: number, r: number) => {
   return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
 };
@@ -90,6 +96,14 @@ export default function App() {
   const [cells, setCells] = useState<Record<string, HexCell>>(() => {
     return createEmptyCells(6);
   });
+  const [maps, setMaps] = useState<AtlasMap[]>(() => [
+    {
+      id: EXPORT_MAP_ID,
+      radius: 6,
+      cells: createEmptyCells(6),
+    },
+  ]);
+  const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
 
   // Hot selection editing states
   const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "eraser">("terrain");
@@ -117,6 +131,27 @@ export default function App() {
   const [showCoordinatesOverlay, setShowCoordinatesOverlay] = useState<boolean>(true);
   const [showDemoHelp, setShowDemoHelp] = useState<boolean>(true);
 
+  const getMapsWithCurrentSnapshot = useCallback((): AtlasMap[] => {
+    return maps.map((map, index) => index === selectedMapIndex ? {
+      ...map,
+      radius,
+      cells: JSON.parse(JSON.stringify(cells)),
+    } : map);
+  }, [maps, selectedMapIndex, cells, radius]);
+
+  const updateCurrentMapSnapshot = useCallback((nextCells: Record<string, HexCell>, nextRadius: number) => {
+    setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
+      ...map,
+      radius: nextRadius,
+      cells: JSON.parse(JSON.stringify(nextCells)),
+    } : map));
+  }, [selectedMapIndex]);
+
+  const resetHistory = useCallback((nextCells: Record<string, HexCell>, nextRadius: number) => {
+    setHistory([{ cells: JSON.parse(JSON.stringify(nextCells)), radius: nextRadius }]);
+    setHistoryIndex(0);
+  }, []);
+
   // Initialize History with current state
   useEffect(() => {
     const initialState = { cells: createEmptyCells(6), radius: 6 };
@@ -141,6 +176,72 @@ export default function App() {
     }
   };
 
+  const handleSelectMap = (mapIndex: number) => {
+    if (mapIndex < 0 || mapIndex >= maps.length || mapIndex === selectedMapIndex) {
+      return;
+    }
+
+    const nextMaps = getMapsWithCurrentSnapshot();
+    const targetMap = nextMaps[mapIndex];
+    setMaps(nextMaps);
+    setSelectedMapIndex(mapIndex);
+    setCells(JSON.parse(JSON.stringify(targetMap.cells)));
+    setRadius(targetMap.radius);
+    resetHistory(targetMap.cells, targetMap.radius);
+    setHoveredCell(null);
+    setPanX(0);
+    setPanY(0);
+    setScale(1);
+  };
+
+  const handleAddMap = () => {
+    const nextMaps = getMapsWithCurrentSnapshot();
+    const nextMapNumber = nextMaps.length + 1;
+    const nextMap: AtlasMap = {
+      id: `map-${nextMapNumber}`,
+      radius: 6,
+      cells: createEmptyCells(6),
+    };
+
+    setMaps([...nextMaps, nextMap]);
+    setSelectedMapIndex(nextMaps.length);
+    setCells(JSON.parse(JSON.stringify(nextMap.cells)));
+    setRadius(nextMap.radius);
+    resetHistory(nextMap.cells, nextMap.radius);
+    setHoveredCell(null);
+    setPanX(0);
+    setPanY(0);
+    setScale(1);
+  };
+
+  const handleDeleteMap = () => {
+    if (maps.length <= 1) {
+      return;
+    }
+
+    const nextMaps = getMapsWithCurrentSnapshot().filter((_, index) => index !== selectedMapIndex);
+    const nextSelectedIndex = Math.min(selectedMapIndex, nextMaps.length - 1);
+    const targetMap = nextMaps[nextSelectedIndex];
+
+    setMaps(nextMaps);
+    setSelectedMapIndex(nextSelectedIndex);
+    setCells(JSON.parse(JSON.stringify(targetMap.cells)));
+    setRadius(targetMap.radius);
+    resetHistory(targetMap.cells, targetMap.radius);
+    setHoveredCell(null);
+    setPanX(0);
+    setPanY(0);
+    setScale(1);
+  };
+
+  const handleRenameMap = (nextId: string) => {
+    const sanitizedId = nextId.trim();
+    setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
+      ...map,
+      id: sanitizedId || map.id,
+    } : map));
+  };
+
   // Undo
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
@@ -148,9 +249,10 @@ export default function App() {
       const targetState = history[prevIndex];
       setCells(JSON.parse(JSON.stringify(targetState.cells)));
       setRadius(targetState.radius);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius);
       setHistoryIndex(prevIndex);
     }
-  }, [historyIndex, history]);
+  }, [historyIndex, history, updateCurrentMapSnapshot]);
 
   // Redo
   const handleRedo = useCallback(() => {
@@ -159,9 +261,10 @@ export default function App() {
       const targetState = history[nextIndex];
       setCells(JSON.parse(JSON.stringify(targetState.cells)));
       setRadius(targetState.radius);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius);
       setHistoryIndex(nextIndex);
     }
-  }, [historyIndex, history]);
+  }, [historyIndex, history, updateCurrentMapSnapshot]);
 
   // Customizable grid resizing (支援自定義格數)
   const handleResizeGrid = (newRadius: number) => {
@@ -188,6 +291,7 @@ export default function App() {
     pushToHistory(newCells, newRadius);
     setCells(newCells);
     setRadius(newRadius);
+    updateCurrentMapSnapshot(newCells, newRadius);
     
     // Auto center map camera
     setPanX(0);
@@ -199,6 +303,7 @@ export default function App() {
     const cleanCells = createEmptyCells(radius);
     pushToHistory(cleanCells, radius);
     setCells(cleanCells);
+    updateCurrentMapSnapshot(cleanCells, radius);
   };
 
   // Cell Painter logic
@@ -236,12 +341,13 @@ export default function App() {
 
     const nextCells = { ...cells, [key]: updatedCell };
     setCells(nextCells);
+    updateCurrentMapSnapshot(nextCells, radius);
 
     // Accumulate alterations within the active paint stroke
     if (strokeChangesRef.current) {
       strokeChangesRef.current[key] = updatedCell;
     }
-  }, [cells, activeLayer, selectedTerrain, selectedLandmark, selectedStyle]);
+  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, updateCurrentMapSnapshot]);
 
   // Pointer triggers
   const handleHexMouseDown = (e: React.MouseEvent, cell: HexCell) => {
@@ -332,13 +438,12 @@ export default function App() {
     e.preventDefault();
   };
 
-  // Export JSON string output
-  const getCurrentJSON = (): string => {
-    const exportCells = (Object.values(cells) as HexCell[]).filter((c) => c.terrain !== TerrainType.NONE);
-    const exportData = {
-      id: EXPORT_MAP_ID,
+  const serializeMap = (map: AtlasMap) => {
+    const exportCells = (Object.values(map.cells) as HexCell[]).filter((c) => c.terrain !== TerrainType.NONE);
+    return {
+      id: map.id,
       world: {
-        radius,
+        radius: map.radius,
         tiles: exportCells.map((c) => ({
           c: `${c.q},${c.r}`,
           t: terrainToCode.get(c.terrain) ?? 0,
@@ -353,6 +458,70 @@ export default function App() {
           .map((c) => `${c.q},${c.r}`),
       },
     };
+  };
+
+  const parseImportedMap = (data: any, fallbackId: string): AtlasMap | null => {
+    const importedCells = Array.isArray(data) ? data : data.world?.tiles ?? data.tiles ?? data.cells;
+    if (!Array.isArray(importedCells)) {
+      return null;
+    }
+
+    const incomingCells: Record<string, HexCell> = {};
+    let inferredRadius = 0;
+
+    importedCells.forEach((c: any) => {
+      let nextCell: HexCell | null = null;
+
+      if (typeof c.c === "string") {
+        const [qText, rText] = c.c.split(",");
+        const q = Number(qText);
+        const r = Number(rText);
+
+        if (Number.isFinite(q) && Number.isFinite(r)) {
+          nextCell = {
+            q,
+            r,
+            terrain: terrainByCode[c.t] ?? TerrainType.PLAIN,
+            landmark: landmarkByCode[c.f] ?? LandmarkType.NONE,
+            style: styleByCode[c.l] ?? StyleVariant.NORMAL,
+          };
+        }
+      } else if (typeof c.q === "number" && typeof c.r === "number") {
+        nextCell = {
+          q: c.q,
+          r: c.r,
+          terrain: c.terrain || TerrainType.PLAIN,
+          landmark: c.landmark || LandmarkType.NONE,
+          style: c.style || StyleVariant.NORMAL,
+        };
+      }
+
+      if (nextCell) {
+        incomingCells[`${nextCell.q},${nextCell.r}`] = nextCell;
+        inferredRadius = Math.max(inferredRadius, getHexDistanceFromOrigin(nextCell.q, nextCell.r));
+      }
+    });
+
+    if (Object.keys(incomingCells).length === 0) {
+      return null;
+    }
+
+    const nextRadius = typeof data.world?.radius === "number"
+      ? data.world.radius
+      : typeof data.radius === "number"
+        ? data.radius
+        : inferredRadius;
+
+    return {
+      id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallbackId,
+      radius: nextRadius,
+      cells: { ...createNoTerrainCells(nextRadius), ...incomingCells },
+    };
+  };
+
+  // Export JSON string output
+  const getCurrentJSON = (): string => {
+    const exportData = getMapsWithCurrentSnapshot().map((map) => serializeMap(map));
     return JSON.stringify(exportData, null, 2);
   };
 
@@ -363,7 +532,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `fantasy-hex-map-r${radius}.json`;
+    link.download = `fantasy-hex-map-atlas.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -374,62 +543,22 @@ export default function App() {
   const handleImportJSON = (jsonText: string): boolean => {
     try {
       const data = JSON.parse(jsonText);
-      const importedCells = Array.isArray(data) ? data : data.world?.tiles ?? data.tiles ?? data.cells;
-      if (!Array.isArray(importedCells)) {
+      const isMapCollection = Array.isArray(data) && data.some((item) => item?.world || typeof item?.id === "string");
+      const importedMaps = isMapCollection
+        ? data.map((item, index) => parseImportedMap(item, `map-${index + 1}`)).filter(Boolean) as AtlasMap[]
+        : [parseImportedMap(data, EXPORT_MAP_ID)].filter(Boolean) as AtlasMap[];
+
+      if (importedMaps.length === 0) {
         return false;
       }
 
-      const incomingCells: Record<string, HexCell> = {};
-      let inferredRadius = 0;
+      const firstMap = importedMaps[0];
 
-      importedCells.forEach((c: any) => {
-        let nextCell: HexCell | null = null;
-
-        if (typeof c.c === "string") {
-          const [qText, rText] = c.c.split(",");
-          const q = Number(qText);
-          const r = Number(rText);
-
-          if (Number.isFinite(q) && Number.isFinite(r)) {
-            nextCell = {
-              q,
-              r,
-              terrain: terrainByCode[c.t] ?? TerrainType.PLAIN,
-              landmark: landmarkByCode[c.f] ?? LandmarkType.NONE,
-              style: styleByCode[c.l] ?? StyleVariant.NORMAL,
-            };
-          }
-        } else if (typeof c.q === "number" && typeof c.r === "number") {
-          nextCell = {
-            q: c.q,
-            r: c.r,
-            terrain: c.terrain || TerrainType.PLAIN,
-            landmark: c.landmark || LandmarkType.NONE,
-            style: c.style || StyleVariant.NORMAL,
-          };
-        }
-
-        if (nextCell) {
-          incomingCells[`${nextCell.q},${nextCell.r}`] = nextCell;
-          inferredRadius = Math.max(inferredRadius, getHexDistanceFromOrigin(nextCell.q, nextCell.r));
-        }
-      });
-
-      // Confirm we have coordinates matched
-      if (Object.keys(incomingCells).length === 0) {
-        return false;
-      }
-
-      const nextRadius = typeof data.world?.radius === "number"
-        ? data.world.radius
-        : typeof data.radius === "number"
-          ? data.radius
-          : inferredRadius;
-      const nextCells = { ...createNoTerrainCells(nextRadius), ...incomingCells };
-
-      setRadius(nextRadius);
-      setCells(nextCells);
-      pushToHistory(nextCells, nextRadius);
+      setMaps(importedMaps);
+      setSelectedMapIndex(0);
+      setRadius(firstMap.radius);
+      setCells(JSON.parse(JSON.stringify(firstMap.cells)));
+      resetHistory(firstMap.cells, firstMap.radius);
 
       // Reset camera view
       setPanX(0);
@@ -459,6 +588,12 @@ export default function App() {
         redo={handleRedo}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
+        maps={maps.map((map) => ({ id: map.id }))}
+        selectedMapIndex={selectedMapIndex}
+        onSelectMap={handleSelectMap}
+        onAddMap={handleAddMap}
+        onDeleteMap={handleDeleteMap}
+        onRenameMap={handleRenameMap}
         exportJSON={handleExportJSON}
         importJSON={handleImportJSON}
         onClearMap={handleClearMap}

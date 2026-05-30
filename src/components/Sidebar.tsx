@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { TerrainType, LandmarkType, StyleVariant, HexCell } from "../types";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "../constants";
 import {
@@ -21,7 +21,10 @@ import {
   FileCode,
   Trash2,
   Copy,
-  Check
+  Check,
+  Plus,
+  PencilLine,
+  Map
 } from "lucide-react";
 
 interface SidebarProps {
@@ -48,6 +51,14 @@ interface SidebarProps {
   canUndo: boolean;
   canRedo: boolean;
 
+  // Map Atlas Controls
+  maps: { id: string }[];
+  selectedMapIndex: number;
+  onSelectMap: (mapIndex: number) => void;
+  onAddMap: () => void;
+  onDeleteMap: () => void;
+  onRenameMap: (nextId: string) => void;
+
   // JSON Operations
   exportJSON: () => void;
   importJSON: (data: string) => boolean;
@@ -73,6 +84,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   redo,
   canUndo,
   canRedo,
+  maps,
+  selectedMapIndex,
+  onSelectMap,
+  onAddMap,
+  onDeleteMap,
+  onRenameMap,
   exportJSON,
   importJSON,
   onClearMap,
@@ -83,7 +100,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [inputRadius, setInputRadius] = useState<number>(radius);
+  const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setInputRadius(radius);
+  }, [radius]);
+
+  useEffect(() => {
+    setMapNameInput(maps[selectedMapIndex]?.id ?? "");
+  }, [maps, selectedMapIndex]);
 
   // Handle direct file uploads
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,6 +192,76 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Main Tools Container */}
       <div className="p-5 flex-1 flex flex-col space-y-6">
+        {/* Map Atlas */}
+        <div className="space-y-3">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <Map className="w-3.5 h-3.5 text-slate-400" />
+            地圖集
+          </span>
+
+          <div className="space-y-2">
+            <select
+              id="atlas-map-select"
+              value={selectedMapIndex}
+              onChange={(e) => onSelectMap(Number(e.target.value))}
+              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            >
+              {maps.map((map, index) => (
+                <option key={`${map.id}-${index}`} value={index}>
+                  {index + 1}. {map.id}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1">
+                <PencilLine className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="atlas-map-name-input"
+                  type="text"
+                  value={mapNameInput}
+                  onChange={(e) => setMapNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  onBlur={() => {
+                    const nextName = mapNameInput.trim() || maps[selectedMapIndex]?.id || "map-1";
+                    setMapNameInput(nextName);
+                    onRenameMap(nextName);
+                  }}
+                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                id="atlas-add-map-btn"
+                onClick={onAddMap}
+                className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>新增地圖</span>
+              </button>
+              <button
+                id="atlas-delete-map-btn"
+                onClick={onDeleteMap}
+                disabled={maps.length <= 1}
+                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                  maps.length > 1
+                    ? "bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-100"
+                    : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>刪除目前地圖</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Layer / Brush Modes */}
         <div>
           <div className="flex items-center justify-between mb-3">
