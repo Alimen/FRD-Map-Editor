@@ -1,0 +1,653 @@
+﻿/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { HexCell, TerrainType, LandmarkType, StyleVariant } from "./types";
+import { Sidebar } from "./components/Sidebar";
+import { HexRenderer } from "./components/HexRenderer";
+import { axialToPixel } from "./hexLayout";
+import {
+  ZoomIn,
+  ZoomOut,
+  HelpCircle,
+  Compass,
+  MousePointerClick
+} from "lucide-react";
+
+const createCells = (radius: number, terrain: TerrainType): Record<string, HexCell> => {
+  const emptyCells: Record<string, HexCell> = {};
+
+  for (let q = -radius; q <= radius; q++) {
+    const rStart = Math.max(-radius, -q - radius);
+    const rEnd = Math.min(radius, -q + radius);
+    for (let r = rStart; r <= rEnd; r++) {
+      emptyCells[`${q},${r}`] = {
+        q,
+        r,
+        terrain,
+        landmark: LandmarkType.NONE,
+        style: StyleVariant.NORMAL,
+      };
+    }
+  }
+
+  return emptyCells;
+};
+
+const createEmptyCells = (radius: number): Record<string, HexCell> => createCells(radius, TerrainType.PLAIN);
+const createNoTerrainCells = (radius: number): Record<string, HexCell> => createCells(radius, TerrainType.NONE);
+
+const terrainByCode = [
+  TerrainType.PLAIN,
+  TerrainType.HILL,
+  TerrainType.MOUNTAIN,
+  TerrainType.LOWLAND,
+];
+
+const landmarkByCode = [
+  LandmarkType.NONE,
+  LandmarkType.MAIN_DUNGEON,
+  LandmarkType.SUB_DUNGEON,
+  LandmarkType.MAIN_CAMP,
+  LandmarkType.SUB_CAMP,
+];
+
+const styleByCode = [
+  StyleVariant.NORMAL,
+  StyleVariant.DEMONIC,
+  StyleVariant.LOVECRAFTIAN,
+  StyleVariant.UNDEAD,
+  StyleVariant.DRACONIC,
+];
+
+const terrainToCode = new Map<TerrainType, number>(terrainByCode.map((type, code) => [type, code]));
+const landmarkToCode = new Map<LandmarkType, number>(landmarkByCode.map((type, code) => [type, code]));
+const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) => [type, code]));
+
+const getHexDistanceFromOrigin = (q: number, r: number) => {
+  return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
+};
+
+export default function App() {
+  // Grid Sizing state
+  const [radius, setRadius] = useState<number>(6);
+  const [cellSize, setCellSize] = useState<number>(42);
+
+  // Hex Cell State Map (Key is "q,r")
+  const [cells, setCells] = useState<Record<string, HexCell>>(() => {
+    return createEmptyCells(6);
+  });
+
+  // Hot selection editing states
+  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "eraser">("terrain");
+  const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
+  const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
+  const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
+
+  // Coordination displays
+  const [hoveredCell, setHoveredCell] = useState<HexCell | null>(null);
+
+  // Dynamic Camera coordinates panning/zooming states
+  const [scale, setScale] = useState<number>(1);
+  const [panX, setPanX] = useState<number>(0);
+  const [panY, setPanY] = useState<number>(0);
+  const [isPanning, setIsPanning] = useState<boolean>(false);
+  const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Undo/Redo historical record arrays
+  const [history, setHistory] = useState<{ cells: Record<string, HexCell>; radius: number }[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
+  // High performance painting states
+  const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
+  const strokeChangesRef = useRef<Record<string, HexCell> | null>(null);
+  const [showCoordinatesOverlay, setShowCoordinatesOverlay] = useState<boolean>(true);
+  const [showDemoHelp, setShowDemoHelp] = useState<boolean>(true);
+
+  // Initialize History with current state
+  useEffect(() => {
+    const initialState = { cells: createEmptyCells(6), radius: 6 };
+    setHistory([initialState]);
+    setHistoryIndex(0);
+  }, []);
+
+  const pushToHistory = (newCells: Record<string, HexCell>, newRadius: number) => {
+    const freshState = { cells: JSON.parse(JSON.stringify(newCells)), radius: newRadius };
+    // Slice off any REDO redoable states
+    const sliceHistory = history.slice(0, historyIndex + 1);
+    const updatedHistory = [...sliceHistory, freshState];
+    
+    // Cap history length at 50 to avoid high memory impact
+    if (updatedHistory.length > 50) {
+      updatedHistory.shift();
+      setHistory(updatedHistory);
+      setHistoryIndex(updatedHistory.length - 1);
+    } else {
+      setHistory(updatedHistory);
+      setHistoryIndex(updatedHistory.length - 1);
+    }
+  };
+
+  // Undo
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const prevIndex = historyIndex - 1;
+      const targetState = history[prevIndex];
+      setCells(JSON.parse(JSON.stringify(targetState.cells)));
+      setRadius(targetState.radius);
+      setHistoryIndex(prevIndex);
+    }
+  }, [historyIndex, history]);
+
+  // Redo
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1;
+      const targetState = history[nextIndex];
+      setCells(JSON.parse(JSON.stringify(targetState.cells)));
+      setRadius(targetState.radius);
+      setHistoryIndex(nextIndex);
+    }
+  }, [historyIndex, history]);
+
+  // Customizable grid resizing (支援自定義格數)
+  const handleResizeGrid = (newRadius: number) => {
+    const newCells: Record<string, HexCell> = {};
+    for (let q = -newRadius; q <= newRadius; q++) {
+      const rStart = Math.max(-newRadius, -q - newRadius);
+      const rEnd = Math.min(newRadius, -q + newRadius);
+      for (let r = rStart; r <= rEnd; r++) {
+        const key = `${q},${r}`;
+        if (cells[key]) {
+          newCells[key] = { ...cells[key] };
+        } else {
+          // Initialize outer expansion
+          newCells[key] = {
+            q,
+            r,
+            terrain: TerrainType.PLAIN,
+            landmark: LandmarkType.NONE,
+            style: StyleVariant.NORMAL,
+          };
+        }
+      }
+    }
+    pushToHistory(newCells, newRadius);
+    setCells(newCells);
+    setRadius(newRadius);
+    
+    // Auto center map camera
+    setPanX(0);
+    setPanY(0);
+  };
+
+  // Reset/Clear Entire Map
+  const handleClearMap = () => {
+    const cleanCells = createEmptyCells(radius);
+    pushToHistory(cleanCells, radius);
+    setCells(cleanCells);
+  };
+
+  // Cell Painter logic
+  const paintCell = useCallback((targetCell: HexCell) => {
+    const key = `${targetCell.q},${targetCell.r}`;
+    const previous = cells[key];
+    if (!previous) return;
+
+    let updatedCell = { ...previous };
+
+    if (activeLayer === "eraser") {
+      updatedCell.terrain = TerrainType.PLAIN;
+      updatedCell.landmark = LandmarkType.NONE;
+      updatedCell.style = StyleVariant.NORMAL;
+    } else if (activeLayer === "terrain") {
+      updatedCell.terrain = selectedTerrain;
+      if (selectedTerrain === TerrainType.NONE) {
+        updatedCell.landmark = LandmarkType.NONE;
+        updatedCell.style = StyleVariant.NORMAL;
+      }
+    } else if (activeLayer === "landmark") {
+      updatedCell.landmark = selectedLandmark;
+    } else if (activeLayer === "style") {
+      updatedCell.style = selectedStyle;
+    }
+
+    // Check if cell parameters actually changed to avoid saving redundant modifications
+    if (
+      updatedCell.terrain === previous.terrain &&
+      updatedCell.landmark === previous.landmark &&
+      updatedCell.style === previous.style
+    ) {
+      return;
+    }
+
+    const nextCells = { ...cells, [key]: updatedCell };
+    setCells(nextCells);
+
+    // Accumulate alterations within the active paint stroke
+    if (strokeChangesRef.current) {
+      strokeChangesRef.current[key] = updatedCell;
+    }
+  }, [cells, activeLayer, selectedTerrain, selectedLandmark, selectedStyle]);
+
+  // Pointer triggers
+  const handleHexMouseDown = (e: React.MouseEvent, cell: HexCell) => {
+    // Only paint with left clicks
+    if (e.button !== 0) return;
+    setIsMouseDown(true);
+    // Begin a paint transaction
+    strokeChangesRef.current = {};
+    paintCell(cell);
+  };
+
+  const handleHexMouseEnter = (e: React.MouseEvent, cell: HexCell) => {
+    setHoveredCell(cell);
+    if (isMouseDown) {
+      paintCell(cell);
+    }
+  };
+
+  const handleHexMouseLeave = (e: React.MouseEvent, cell: HexCell) => {
+    if (hoveredCell?.q === cell.q && hoveredCell?.r === cell.r) {
+      setHoveredCell(null);
+    }
+  };
+
+  // Canvas Drag/Pan
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Right click or Middle click or Left click while targeting background allows dragging
+    const targetElement = e.target as SVGElement;
+    const isBackground = targetElement.classList.contains("background-grip") || targetElement.tagName === "svg";
+    
+    if (e.button === 2 || e.button === 1 || isBackground) {
+      setIsPanning(true);
+      panStartRef.current = { x: e.clientX - panX, y: e.clientY - panY };
+      e.preventDefault();
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPanX(e.clientX - panStartRef.current.x);
+      setPanY(e.clientY - panStartRef.current.y);
+    }
+  };
+
+  // Window mouseup listener terminates active states and commits history
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsMouseDown(false);
+      setIsPanning(false);
+
+      // Stroke holds paint changes? Commit as a individual historic state
+      if (strokeChangesRef.current && Object.keys(strokeChangesRef.current).length > 0) {
+        pushToHistory(cells, radius);
+      }
+      strokeChangesRef.current = null;
+    };
+
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, [cells, radius, pushToHistory]);
+
+  // Mouse wheel zoom
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = 0.08;
+    const newScale = e.deltaY < 0 ? scale + zoomFactor : scale - zoomFactor;
+    setScale(Math.max(0.4, Math.min(2.5, newScale)));
+  };
+
+  const handleZoomIn = () => {
+    setScale((prev) => Math.min(2.5, prev + 0.15));
+  };
+
+  const handleZoomOut = () => {
+    setScale((prev) => Math.max(0.4, prev - 0.15));
+  };
+
+  const handleResetCamera = () => {
+    setScale(1);
+    setPanX(0);
+    setPanY(0);
+  };
+
+  // Prevent right-click context menu on workspace (for flawless panning)
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+  };
+
+  // Export JSON string output
+  const getCurrentJSON = (): string => {
+    const exportCells = (Object.values(cells) as HexCell[]).filter((c) => c.terrain !== TerrainType.NONE);
+    const exportData = {
+      generator: "Fantasy Hex Map Editor",
+      createdAt: new Date().toISOString(),
+      radius,
+      cellsCount: exportCells.length,
+      cells: exportCells.map((c) => ({
+        c: `${c.q},${c.r}`,
+        t: terrainToCode.get(c.terrain) ?? 0,
+        l: styleToCode.get(c.style) ?? 0,
+        f: landmarkToCode.get(c.landmark) ?? 0,
+      })),
+    };
+    return JSON.stringify(exportData, null, 2);
+  };
+
+  // File download helper
+  const handleExportJSON = () => {
+    const jsonStr = getCurrentJSON();
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `fantasy-hex-map-r${radius}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Import JSON validator and parser
+  const handleImportJSON = (jsonText: string): boolean => {
+    try {
+      const data = JSON.parse(jsonText);
+      const importedCells = Array.isArray(data) ? data : data.cells;
+      if (!Array.isArray(importedCells)) {
+        return false;
+      }
+
+      const incomingCells: Record<string, HexCell> = {};
+      let inferredRadius = 0;
+
+      importedCells.forEach((c: any) => {
+        let nextCell: HexCell | null = null;
+
+        if (typeof c.c === "string") {
+          const [qText, rText] = c.c.split(",");
+          const q = Number(qText);
+          const r = Number(rText);
+
+          if (Number.isFinite(q) && Number.isFinite(r)) {
+            nextCell = {
+              q,
+              r,
+              terrain: terrainByCode[c.t] ?? TerrainType.PLAIN,
+              landmark: landmarkByCode[c.f] ?? LandmarkType.NONE,
+              style: styleByCode[c.l] ?? StyleVariant.NORMAL,
+            };
+          }
+        } else if (typeof c.q === "number" && typeof c.r === "number") {
+          nextCell = {
+            q: c.q,
+            r: c.r,
+            terrain: c.terrain || TerrainType.PLAIN,
+            landmark: c.landmark || LandmarkType.NONE,
+            style: c.style || StyleVariant.NORMAL,
+          };
+        }
+
+        if (nextCell) {
+          incomingCells[`${nextCell.q},${nextCell.r}`] = nextCell;
+          inferredRadius = Math.max(inferredRadius, getHexDistanceFromOrigin(nextCell.q, nextCell.r));
+        }
+      });
+
+      // Confirm we have coordinates matched
+      if (Object.keys(incomingCells).length === 0) {
+        return false;
+      }
+
+      const nextRadius = typeof data.radius === "number" ? data.radius : inferredRadius;
+      const nextCells = { ...createNoTerrainCells(nextRadius), ...incomingCells };
+
+      setRadius(nextRadius);
+      setCells(nextCells);
+      pushToHistory(nextCells, nextRadius);
+
+      // Reset camera view
+      setPanX(0);
+      setPanY(0);
+      setScale(1);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  return (
+    <div className="flex flex-col lg:flex-row h-screen w-screen bg-slate-100 overflow-hidden text-slate-800">
+      {/* Sidebar Toolpanel */}
+      <Sidebar
+        activeLayer={activeLayer}
+        setActiveLayer={setActiveLayer}
+        selectedTerrain={selectedTerrain}
+        setSelectedTerrain={setSelectedTerrain}
+        selectedLandmark={selectedLandmark}
+        setSelectedLandmark={setSelectedLandmark}
+        selectedStyle={selectedStyle}
+        setSelectedStyle={setSelectedStyle}
+        radius={radius}
+        onResizeGrid={handleResizeGrid}
+        undo={handleUndo}
+        redo={handleRedo}
+        canUndo={historyIndex > 0}
+        canRedo={historyIndex < history.length - 1}
+        exportJSON={handleExportJSON}
+        importJSON={handleImportJSON}
+        onClearMap={handleClearMap}
+        getCurrentJSON={getCurrentJSON}
+        hoveredCell={hoveredCell}
+      />
+
+      {/* Main Interactive Map Canvas Space */}
+      <div className="flex-1 flex flex-col relative h-full">
+        {/* Navigation / Control overlays */}
+        <div className="absolute top-4 left-4 z-10 flex gap-2">
+          {/* Zoom & Helper Pill */}
+          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-sm p-1.5 rounded-xl border border-slate-200 shadow-lg shadow-slate-200/50">
+            <button
+              onClick={handleZoomIn}
+              className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
+              title="放大 (Move to Zoom In)"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleZoomOut}
+              className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
+              title="縮小 (Move to Zoom Out)"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleResetCamera}
+              className="px-2 py-1 text-[11px] font-bold text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+              title="重設視角"
+            >
+              重置視角
+            </button>
+            <div className="w-px h-4 bg-slate-200 mx-1" />
+            <div className="px-2 text-[11px] font-mono font-semibold text-slate-400">
+              {Math.round(scale * 100)}%
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-sm p-1.5 rounded-xl border border-slate-200 shadow-lg shadow-slate-200/50">
+            <button
+              onClick={() => setShowCoordinatesOverlay((prev) => !prev)}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                showCoordinatesOverlay
+                  ? "bg-indigo-50 text-indigo-700"
+                  : "text-slate-500 hover:bg-slate-100"
+              }`}
+            >
+              格內座標 {showCoordinatesOverlay ? "顯示中" : "已隱藏"}
+            </button>
+          </div>
+        </div>
+
+        {/* Floating Quick Action Keys Panel (Top Right) */}
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <button
+            onClick={() => setShowDemoHelp((prev) => !prev)}
+            className="p-2 bg-white/95 backdrop-blur border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl shadow-lg transition-colors"
+            title="操作指示"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Demo operational help alert popup */}
+        {showDemoHelp && (
+          <div className="absolute bottom-4 right-4 z-20 max-w-sm bg-slate-900/95 backdrop-blur text-white p-4 rounded-xl shadow-xl border border-slate-700/80 text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                <Compass className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "12s" }} />
+                滑鼠探索與編輯捷徑
+              </span>
+              <button
+                onClick={() => setShowDemoHelp(false)}
+                className="text-slate-400 hover:text-white font-mono scale-110 px-1"
+              >
+                ×
+              </button>
+            </div>
+            <ul className="space-y-1.5 text-slate-300 leading-relaxed font-sans">
+              <li className="flex items-start gap-1.5">
+                <span className="text-amber-400">❶</span>
+                <span><strong>拖曳著色：</strong>按住滑鼠左鍵並行經格子，可快速連續刷上選取的屬性。</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-amber-400">❷</span>
+                <span><strong>視野平移：</strong>在空白處按住<strong>左鍵拖曳</strong>、按住<strong>中鍵滾輪</strong>，或使用<strong>右鍵拖曳</strong>，即可平移視圖。</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="text-amber-400">❸</span>
+                <span><strong>滾輪縮放：</strong>在畫面上滑動滑鼠滾輪，便能直接放大縮小格線。</span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        {/* Center Live Coordinates Floating Hub */}
+        <div id="live-coordinates-hub" className="absolute bottom-4 left-4 z-10 bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-xl text-white border border-slate-700 shadow-xl font-mono text-xs flex items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <MousePointerClick className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-slate-400 font-bold">探針座標:</span>
+          </div>
+          {hoveredCell ? (
+            <span className="text-amber-400 font-bold text-sm tracking-wider">
+              q: {hoveredCell.q} , r: {hoveredCell.r}
+            </span>
+          ) : (
+            <span className="text-slate-400 italic">置於格上以取得座標</span>
+          )}
+        </div>
+
+        {/* Interactive Workspace SVG Map Container */}
+        <div
+          id="map-container-canvas"
+          className="w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center cursor-all-scroll active:cursor-grabbing select-none"
+          onMouseDown={handleCanvasMouseDown}
+          onMouseMove={handleCanvasMouseMove}
+          onWheel={handleWheel}
+          onContextMenu={handleContextMenu}
+        >
+          {/* Fanciful blueprint grid background effect */}
+          <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1.2px,transparent_1.2px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+
+          {/* Epic ambient core glow in center */}
+          <div className="absolute w-[600px] h-[600px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
+
+          {/* Primary SVG Vector workspace content */}
+          <svg
+            id="hex-editor-svg"
+            className="w-full h-full drop-shadow-2xl transition-transform duration-75 ease-out select-none"
+            style={{ pointerEvents: "auto" }}
+          >
+            {/* Embedded Definitions & Gradients for High fidelity visualization */}
+            <defs>
+              {/* Terrain Gradients */}
+              <linearGradient id={`grad-${TerrainType.PLAIN}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#d2f1b0" />
+                <stop offset="100%" stopColor="#a9dd7f" />
+              </linearGradient>
+              <linearGradient id={`grad-${TerrainType.HILL}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fae7b9" />
+                <stop offset="100%" stopColor="#dfbf75" />
+              </linearGradient>
+              <linearGradient id={`grad-${TerrainType.MOUNTAIN}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ecdfe8" />
+                <stop offset="100%" stopColor="#9a9fade" />
+              </linearGradient>
+              <linearGradient id={`grad-${TerrainType.LOWLAND}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#bce7fb" />
+                <stop offset="100%" stopColor="#7cbdd8" />
+              </linearGradient>
+            </defs>
+
+            {/* Transform Group carrying Pan & Zoom settings */}
+            <g transform={`translate(${panX + (window.innerWidth - (window.innerWidth < 1024 ? 0 : 384)) / 2}, ${panY + window.innerHeight / 2}) scale(${scale})`}>
+              {/* Outer radius circular boundary backing */}
+              <circle
+                cx="0"
+                cy="0"
+                r={cellSize * 1.62 * radius}
+                fill="none"
+                stroke="rgba(255, 255, 255, 0.04)"
+                strokeWidth="1.5"
+                strokeDasharray="5,15"
+                style={{ pointerEvents: "none" }}
+              />
+
+              {/* Loop rendering each hex cell within radius boundaries */}
+              {(Object.values(cells) as HexCell[]).map((cell) => {
+                const key = `${cell.q},${cell.r}`;
+                const isHovered = hoveredCell?.q === cell.q && hoveredCell?.r === cell.r;
+
+                return (
+                  <HexRenderer
+                    key={key}
+                    cell={cell}
+                    size={cellSize}
+                    isHovered={isHovered}
+                    isSelected={false}
+                    onMouseEnter={handleHexMouseEnter}
+                    onMouseLeave={handleHexMouseLeave}
+                    onMouseDown={handleHexMouseDown}
+                  />
+                );
+              })}
+
+              {/* Dynamic Coordinate Text markers directly overlayed on grid centers */}
+              {showCoordinatesOverlay && (Object.values(cells) as HexCell[]).map((cell) => {
+                // Approximate coordinate label points
+                if (cell.terrain === TerrainType.NONE) return null;
+                if (cellSize < 30) return null; // Avoid overlapping text cluttered together when zoomed out
+                const { x: cx, y: cy } = axialToPixel(cell.q, cell.r, cellSize);
+
+                return (
+                  <text
+                    key={`coord-text-${cell.q}-${cell.r}`}
+                    x={cx}
+                    y={cy - cellSize * 0.52}
+                    textAnchor="middle"
+                    className="text-[9px] font-mono font-semibold fill-slate-800/25 pointer-events-none select-none tracking-tighter"
+                  >
+                    {cell.q},{cell.r}
+                  </text>
+                );
+              })}
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+}
