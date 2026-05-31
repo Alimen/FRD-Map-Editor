@@ -66,6 +66,7 @@ const landmarkToCode = new Map<LandmarkType, number>(landmarkByCode.map((type, c
 const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) => [type, code]));
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
+const DEFAULT_MAP_RADIUS = 6;
 
 const dungeonLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_DUNGEON,
@@ -97,18 +98,18 @@ const getHexDistanceFromOrigin = (q: number, r: number) => {
 
 export default function App() {
   // Grid Sizing state
-  const [radius, setRadius] = useState<number>(6);
+  const [radius, setRadius] = useState<number>(DEFAULT_MAP_RADIUS);
   const [cellSize, setCellSize] = useState<number>(42);
 
   // Hex Cell State Map (Key is "q,r")
   const [cells, setCells] = useState<Record<string, HexCell>>(() => {
-    return createEmptyCells(6);
+    return createEmptyCells(DEFAULT_MAP_RADIUS);
   });
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
-      radius: 6,
-      cells: createEmptyCells(6),
+      radius: DEFAULT_MAP_RADIUS,
+      cells: createEmptyCells(DEFAULT_MAP_RADIUS),
     },
   ]);
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
@@ -161,7 +162,7 @@ export default function App() {
 
   // Initialize History with current state
   useEffect(() => {
-    const initialState = { cells: createEmptyCells(6), radius: 6 };
+    const initialState = { cells: createEmptyCells(DEFAULT_MAP_RADIUS), radius: DEFAULT_MAP_RADIUS };
     setHistory([initialState]);
     setHistoryIndex(0);
   }, []);
@@ -205,8 +206,8 @@ export default function App() {
     const nextMaps = getMapsWithCurrentSnapshot();
     const nextMap: AtlasMap = {
       id: getNextMapId(nextMaps),
-      radius: 6,
-      cells: createEmptyCells(6),
+      radius: DEFAULT_MAP_RADIUS,
+      cells: createEmptyCells(DEFAULT_MAP_RADIUS),
     };
 
     setMaps([...nextMaps, nextMap]);
@@ -214,6 +215,26 @@ export default function App() {
     setCells(JSON.parse(JSON.stringify(nextMap.cells)));
     setRadius(nextMap.radius);
     resetHistory(nextMap.cells, nextMap.radius);
+    setHoveredCell(null);
+    setPanX(0);
+    setPanY(0);
+    setScale(1);
+  };
+
+  const handleDuplicateMap = () => {
+    const nextMaps = getMapsWithCurrentSnapshot();
+    const sourceMap = nextMaps[selectedMapIndex];
+    const duplicatedMap: AtlasMap = {
+      id: getNextMapId(nextMaps),
+      radius: sourceMap.radius,
+      cells: JSON.parse(JSON.stringify(sourceMap.cells)),
+    };
+
+    setMaps([...nextMaps, duplicatedMap]);
+    setSelectedMapIndex(nextMaps.length);
+    setCells(JSON.parse(JSON.stringify(duplicatedMap.cells)));
+    setRadius(duplicatedMap.radius);
+    resetHistory(duplicatedMap.cells, duplicatedMap.radius);
     setHoveredCell(null);
     setPanX(0);
     setPanY(0);
@@ -287,7 +308,7 @@ export default function App() {
           newCells[key] = {
             q,
             r,
-            terrain: TerrainType.PLAIN,
+            terrain: TerrainType.NONE,
             landmark: LandmarkType.NONE,
             style: StyleVariant.NORMAL,
           };
@@ -544,7 +565,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `fantasy-hex-map-atlas.json`;
+    link.download = `mapLib.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -604,6 +625,7 @@ export default function App() {
         selectedMapIndex={selectedMapIndex}
         onSelectMap={handleSelectMap}
         onAddMap={handleAddMap}
+        onDuplicateMap={handleDuplicateMap}
         onDeleteMap={handleDeleteMap}
         onRenameMap={handleRenameMap}
         exportJSON={handleExportJSON}

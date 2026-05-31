@@ -58,6 +58,7 @@ interface SidebarProps {
   selectedMapIndex: number;
   onSelectMap: (mapIndex: number) => void;
   onAddMap: () => void;
+  onDuplicateMap: () => void;
   onDeleteMap: () => void;
   onRenameMap: (nextId: string) => void;
 
@@ -128,6 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedMapIndex,
   onSelectMap,
   onAddMap,
+  onDuplicateMap,
   onDeleteMap,
   onRenameMap,
   exportJSON,
@@ -238,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div>
           <h1 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
-            奇幻六角地圖編輯器
+            FRD 地圖編輯器
           </h1>
           <p className="text-[11px] font-mono text-slate-400 font-medium">POINT TOP • AXIAL COORDINATES</p>
         </div>
@@ -290,27 +292,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-1.5">
               <button
                 id="atlas-add-map-btn"
                 onClick={onAddMap}
-                className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100 transition-colors"
+                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-[11px] font-semibold border border-indigo-100 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>新增地圖</span>
+                <span>新增</span>
+              </button>
+              <button
+                id="atlas-duplicate-map-btn"
+                onClick={onDuplicateMap}
+                className="flex items-center justify-center gap-1 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-[11px] font-semibold border border-slate-200 transition-colors"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>複製</span>
               </button>
               <button
                 id="atlas-delete-map-btn"
                 onClick={onDeleteMap}
                 disabled={maps.length <= 1}
-                className={`flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold border transition-colors ${
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
                   maps.length > 1
                     ? "bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-100"
                     : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
                 }`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>刪除目前地圖</span>
+                <span>刪除</span>
               </button>
             </div>
           </div>
@@ -330,9 +340,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   id="grid-radius-input"
                   type="number"
                   min="2"
-                  max="15"
+                  max="30"
                   value={inputRadius}
-                  onChange={(e) => setInputRadius(Math.max(2, Math.min(15, parseInt(e.target.value) || 2)))}
+                  onChange={(e) => setInputRadius(Math.max(2, Math.min(30, parseInt(e.target.value) || 2)))}
                   className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">層</span>
