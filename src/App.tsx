@@ -28,6 +28,7 @@ const createCells = (radius: number, terrain: TerrainType): Record<string, HexCe
         terrain,
         landmark: LandmarkType.NONE,
         style: StyleVariant.NORMAL,
+        v: rollTileVariant(),
       };
     }
   }
@@ -67,6 +68,17 @@ const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) =
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
 const DEFAULT_MAP_RADIUS = 6;
+const MAX_TILE_VARIANT = 30;
+
+const rollTileVariant = () => Math.floor(Math.random() * (MAX_TILE_VARIANT + 1));
+
+const normalizeTileVariant = (value: unknown) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return rollTileVariant();
+  }
+
+  return Math.max(0, Math.min(MAX_TILE_VARIANT, Math.round(value)));
+};
 
 const dungeonLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_DUNGEON,
@@ -311,6 +323,7 @@ export default function App() {
             terrain: TerrainType.NONE,
             landmark: LandmarkType.NONE,
             style: StyleVariant.NORMAL,
+            v: rollTileVariant(),
           };
         }
       }
@@ -347,6 +360,10 @@ export default function App() {
       updatedCell.landmark = selectedLandmark;
     } else if (activeLayer === "style") {
       updatedCell.style = selectedStyle;
+    }
+
+    if (updatedCell.terrain !== previous.terrain) {
+      updatedCell.v = rollTileVariant();
     }
 
     // Check if cell parameters actually changed to avoid saving redundant modifications
@@ -468,6 +485,7 @@ export default function App() {
           t: terrainToCode.get(c.terrain) ?? 0,
           l: styleToCode.get(c.style) ?? 0,
           f: landmarkToCode.get(c.landmark) ?? 0,
+          v: normalizeTileVariant(c.v),
         })),
         dungeonCoords: exportCells
           .filter((c) => dungeonLandmarks.has(c.landmark))
@@ -503,6 +521,7 @@ export default function App() {
             terrain: terrainByCode[c.t] ?? TerrainType.PLAIN,
             landmark: landmarkByCode[c.f] ?? LandmarkType.NONE,
             style: styleByCode[c.l] ?? StyleVariant.NORMAL,
+            v: normalizeTileVariant(c.v),
           };
         }
       } else if (typeof c.q === "number" && typeof c.r === "number") {
@@ -512,6 +531,7 @@ export default function App() {
           terrain: c.terrain || TerrainType.PLAIN,
           landmark: c.landmark || LandmarkType.NONE,
           style: c.style || StyleVariant.NORMAL,
+          v: normalizeTileVariant(c.v),
         };
       }
 
@@ -745,6 +765,10 @@ export default function App() {
                 <span className="text-slate-400 text-[10px]">風格:</span>
                 <span className="font-semibold text-slate-700" style={{ color: STYLE_CONFIGS[hoveredCell.style]?.borderColor }}>
                   {STYLE_CONFIGS[hoveredCell.style]?.label}
+                </span>
+                <span className="ml-auto text-slate-400 text-[10px]">v:</span>
+                <span className="font-mono font-semibold text-slate-700">
+                  {hoveredCell.terrain === TerrainType.NONE ? 0 : hoveredCell.v}
                 </span>
               </div>
             </div>

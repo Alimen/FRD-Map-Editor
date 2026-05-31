@@ -33,6 +33,7 @@ export interface HexCell {
   terrain: TerrainType;
   landmark: LandmarkType;
   style: StyleVariant;
+  v: number;
 }
 
 export interface MapData {
