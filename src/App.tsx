@@ -68,6 +68,7 @@ const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) =
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
 const DEFAULT_MAP_RADIUS = 2;
+const MAX_MAP_RADIUS = 30;
 const MAX_TILE_VARIANT = 30;
 
 const rollTileVariant = () => Math.floor(Math.random() * (MAX_TILE_VARIANT + 1));
@@ -636,6 +637,7 @@ export default function App() {
         selectedStyle={selectedStyle}
         setSelectedStyle={setSelectedStyle}
         radius={radius}
+        maxGridRadius={MAX_MAP_RADIUS}
         onResizeGrid={handleResizeGrid}
         undo={handleUndo}
         redo={handleRedo}

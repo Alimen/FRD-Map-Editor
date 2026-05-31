@@ -45,6 +45,7 @@ interface SidebarProps {
 
   // Grid Controls
   radius: number;
+  maxGridRadius: number;
   onResizeGrid: (newRadius: number) => void;
 
   // History Controls
@@ -120,6 +121,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedStyle,
   setSelectedStyle,
   radius,
+  maxGridRadius,
   onResizeGrid,
   undo,
   redo,
@@ -140,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
-  const [inputRadius, setInputRadius] = useState<number>(radius);
+  const [inputRadiusInput, setInputRadiusInput] = useState<string>(String(radius));
   const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
   const [copied, setCopied] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<SidebarGroupId, boolean>>({
@@ -160,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   useEffect(() => {
-    setInputRadius(radius);
+    setInputRadiusInput(String(radius));
   }, [radius]);
 
   useEffect(() => {
@@ -216,11 +218,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
+  const normalizeRadiusInput = () => {
+    const parsedRadius = Number.parseInt(inputRadiusInput, 10);
+    const nextRadius = Number.isFinite(parsedRadius)
+      ? Math.max(2, Math.min(maxGridRadius, parsedRadius))
+      : radius;
+
+    setInputRadiusInput(String(nextRadius));
+    return nextRadius;
+  };
+
   const handleResizeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputRadius >= 2 && inputRadius <= 15) {
-      onResizeGrid(inputRadius);
-    }
+    onResizeGrid(normalizeRadiusInput());
   };
 
   const copyToClipboard = () => {
@@ -340,9 +350,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   id="grid-radius-input"
                   type="number"
                   min="2"
-                  max="30"
-                  value={inputRadius}
-                  onChange={(e) => setInputRadius(Math.max(2, Math.min(30, parseInt(e.target.value) || 2)))}
+                  max={maxGridRadius}
+                  value={inputRadiusInput}
+                  onChange={(e) => setInputRadiusInput(e.target.value)}
+                  onBlur={normalizeRadiusInput}
                   className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">層</span>
