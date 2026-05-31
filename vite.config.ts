@@ -5,6 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    base: '/FRD-Map-Editor/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
