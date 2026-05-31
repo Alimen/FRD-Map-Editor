@@ -8,6 +8,7 @@ import { HexCell, TerrainType, LandmarkType, StyleVariant } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "./constants";
+import { axialToPixel } from "./hexLayout";
 import {
   ZoomIn,
   ZoomOut,
@@ -109,6 +110,27 @@ const getHexDistanceFromOrigin = (q: number, r: number) => {
   return Math.max(Math.abs(q), Math.abs(r), Math.abs(-q - r));
 };
 
+const hexAngles = [
+  Math.PI / 6,
+  Math.PI / 2,
+  (5 * Math.PI) / 6,
+  (7 * Math.PI) / 6,
+  (3 * Math.PI) / 2,
+  (11 * Math.PI) / 6,
+];
+
+const getHexPointsString = (q: number, r: number, size: number) => {
+  const { x: cx, y: cy } = axialToPixel(q, r, size);
+
+  return hexAngles
+    .map((angle) => {
+      const px = cx + size * Math.cos(angle);
+      const py = cy + size * Math.sin(angle);
+      return `${px},${py}`;
+    })
+    .join(" ");
+};
+
 export default function App() {
   // Grid Sizing state
   const [radius, setRadius] = useState<number>(DEFAULT_MAP_RADIUS);
@@ -133,14 +155,25 @@ export default function App() {
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
 
-  // Coordination displays
-  const [hoveredCell, setHoveredCell] = useState<HexCell | null>(null);
+  // Coordination displays are updated imperatively to keep hover out of React render.
+  const hoveredCellRef = useRef<HexCell | null>(null);
+  const hoverOverlayRef = useRef<SVGPolygonElement | null>(null);
+  const inspectorContentRef = useRef<HTMLDivElement | null>(null);
+  const inspectorEmptyRef = useRef<HTMLDivElement | null>(null);
+  const inspectorAxialRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorCubeRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorTerrainRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorLandmarkRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorStyleRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorVariantRef = useRef<HTMLSpanElement | null>(null);
 
-  // Dynamic Camera coordinates panning/zooming states
-  const [scale, setScale] = useState<number>(1);
-  const [panX, setPanX] = useState<number>(0);
-  const [panY, setPanY] = useState<number>(0);
-  const [isPanning, setIsPanning] = useState<boolean>(false);
+  // Dynamic camera refs avoid rerendering the map while panning or zooming.
+  const cameraGroupRef = useRef<SVGGElement | null>(null);
+  const scaleReadoutRef = useRef<HTMLDivElement | null>(null);
+  const scaleRef = useRef<number>(1);
+  const panXRef = useRef<number>(0);
+  const panYRef = useRef<number>(0);
+  const isPanningRef = useRef<boolean>(false);
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Undo/Redo historical record arrays
@@ -151,6 +184,91 @@ export default function App() {
   const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
   const strokeChangesRef = useRef<Record<string, HexCell> | null>(null);
   const [showDemoHelp, setShowDemoHelp] = useState<boolean>(true);
+
+  const getCameraTransform = useCallback(() => {
+    const sidebarWidth = window.innerWidth < 1024 ? 0 : 384;
+    const centerX = (window.innerWidth - sidebarWidth) / 2;
+    const centerY = window.innerHeight / 2;
+
+    return `translate(${panXRef.current + centerX}, ${panYRef.current + centerY}) scale(${scaleRef.current})`;
+  }, []);
+
+  const updateScaleReadout = useCallback(() => {
+    if (scaleReadoutRef.current) {
+      scaleReadoutRef.current.textContent = `${Math.round(scaleRef.current * 100)}%`;
+    }
+  }, []);
+
+  const updateCameraTransform = useCallback(() => {
+    cameraGroupRef.current?.setAttribute("transform", getCameraTransform());
+    updateScaleReadout();
+  }, [getCameraTransform, updateScaleReadout]);
+
+  const resetCamera = useCallback(() => {
+    scaleRef.current = 1;
+    panXRef.current = 0;
+    panYRef.current = 0;
+    updateCameraTransform();
+  }, [updateCameraTransform]);
+
+  useEffect(() => {
+    updateCameraTransform();
+    window.addEventListener("resize", updateCameraTransform);
+    return () => {
+      window.removeEventListener("resize", updateCameraTransform);
+    };
+  }, [updateCameraTransform]);
+
+  const updateInspector = useCallback((cell: HexCell | null) => {
+    if (inspectorContentRef.current) {
+      inspectorContentRef.current.style.display = cell ? "flex" : "none";
+    }
+    if (inspectorEmptyRef.current) {
+      inspectorEmptyRef.current.style.display = cell ? "none" : "";
+    }
+    if (!cell) {
+      return;
+    }
+
+    if (inspectorAxialRef.current) {
+      inspectorAxialRef.current.textContent = `Axial: (${cell.q}, ${cell.r})`;
+    }
+    if (inspectorCubeRef.current) {
+      inspectorCubeRef.current.textContent = `Cube: (${cell.q}, ${cell.r}, ${-cell.q - cell.r})`;
+    }
+    if (inspectorTerrainRef.current) {
+      inspectorTerrainRef.current.textContent = TERRAIN_CONFIGS[cell.terrain]?.label || cell.terrain;
+    }
+    if (inspectorLandmarkRef.current) {
+      inspectorLandmarkRef.current.textContent = LANDMARK_CONFIGS[cell.landmark]?.label || cell.landmark;
+    }
+    if (inspectorStyleRef.current) {
+      inspectorStyleRef.current.textContent = STYLE_CONFIGS[cell.style]?.label || cell.style;
+      inspectorStyleRef.current.style.color = STYLE_CONFIGS[cell.style]?.borderColor || "";
+    }
+    if (inspectorVariantRef.current) {
+      inspectorVariantRef.current.textContent = String(cell.terrain === TerrainType.NONE ? 0 : cell.v);
+    }
+  }, []);
+
+  const updateHoverOverlay = useCallback((cell: HexCell | null) => {
+    if (!hoverOverlayRef.current) {
+      return;
+    }
+    if (!cell) {
+      hoverOverlayRef.current.style.display = "none";
+      return;
+    }
+
+    hoverOverlayRef.current.setAttribute("points", getHexPointsString(cell.q, cell.r, cellSize));
+    hoverOverlayRef.current.style.display = "";
+  }, [cellSize]);
+
+  const setHoveredCellImperatively = useCallback((cell: HexCell | null) => {
+    hoveredCellRef.current = cell;
+    updateHoverOverlay(cell);
+    updateInspector(cell);
+  }, [updateHoverOverlay, updateInspector]);
 
   const getMapsWithCurrentSnapshot = useCallback((): AtlasMap[] => {
     return maps.map((map, index) => index === selectedMapIndex ? {
@@ -209,10 +327,8 @@ export default function App() {
     setCells(JSON.parse(JSON.stringify(targetMap.cells)));
     setRadius(targetMap.radius);
     resetHistory(targetMap.cells, targetMap.radius);
-    setHoveredCell(null);
-    setPanX(0);
-    setPanY(0);
-    setScale(1);
+    setHoveredCellImperatively(null);
+    resetCamera();
   };
 
   const handleAddMap = () => {
@@ -228,10 +344,8 @@ export default function App() {
     setCells(JSON.parse(JSON.stringify(nextMap.cells)));
     setRadius(nextMap.radius);
     resetHistory(nextMap.cells, nextMap.radius);
-    setHoveredCell(null);
-    setPanX(0);
-    setPanY(0);
-    setScale(1);
+    setHoveredCellImperatively(null);
+    resetCamera();
   };
 
   const handleDuplicateMap = () => {
@@ -248,10 +362,8 @@ export default function App() {
     setCells(JSON.parse(JSON.stringify(duplicatedMap.cells)));
     setRadius(duplicatedMap.radius);
     resetHistory(duplicatedMap.cells, duplicatedMap.radius);
-    setHoveredCell(null);
-    setPanX(0);
-    setPanY(0);
-    setScale(1);
+    setHoveredCellImperatively(null);
+    resetCamera();
   };
 
   const handleDeleteMap = () => {
@@ -268,10 +380,8 @@ export default function App() {
     setCells(JSON.parse(JSON.stringify(targetMap.cells)));
     setRadius(targetMap.radius);
     resetHistory(targetMap.cells, targetMap.radius);
-    setHoveredCell(null);
-    setPanX(0);
-    setPanY(0);
-    setScale(1);
+    setHoveredCellImperatively(null);
+    resetCamera();
   };
 
   const handleRenameMap = (nextId: string) => {
@@ -335,8 +445,7 @@ export default function App() {
     updateCurrentMapSnapshot(newCells, newRadius);
     
     // Auto center map camera
-    setPanX(0);
-    setPanY(0);
+    resetCamera();
   };
 
   // Cell Painter logic
@@ -397,17 +506,18 @@ export default function App() {
   }, [paintCell]);
 
   const handleHexMouseEnter = useCallback((e: React.MouseEvent, cell: HexCell) => {
-    setHoveredCell(cell);
+    setHoveredCellImperatively(cell);
     if (isMouseDown) {
       paintCell(cell);
     }
-  }, [isMouseDown, paintCell]);
+  }, [isMouseDown, paintCell, setHoveredCellImperatively]);
 
   const handleHexMouseLeave = useCallback((e: React.MouseEvent, cell: HexCell) => {
-    setHoveredCell((currentCell) => (
-      currentCell?.q === cell.q && currentCell?.r === cell.r ? null : currentCell
-    ));
-  }, []);
+    const currentCell = hoveredCellRef.current;
+    if (currentCell?.q === cell.q && currentCell?.r === cell.r) {
+      setHoveredCellImperatively(null);
+    }
+  }, [setHoveredCellImperatively]);
 
   // Canvas Drag/Pan
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -416,16 +526,17 @@ export default function App() {
     const isBackground = targetElement.classList.contains("background-grip") || targetElement.tagName === "svg";
     
     if (e.button === 2 || e.button === 1 || isBackground) {
-      setIsPanning(true);
-      panStartRef.current = { x: e.clientX - panX, y: e.clientY - panY };
+      isPanningRef.current = true;
+      panStartRef.current = { x: e.clientX - panXRef.current, y: e.clientY - panYRef.current };
       e.preventDefault();
     }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setPanX(e.clientX - panStartRef.current.x);
-      setPanY(e.clientY - panStartRef.current.y);
+    if (isPanningRef.current) {
+      panXRef.current = e.clientX - panStartRef.current.x;
+      panYRef.current = e.clientY - panStartRef.current.y;
+      updateCameraTransform();
     }
   };
 
@@ -433,7 +544,7 @@ export default function App() {
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       setIsMouseDown(false);
-      setIsPanning(false);
+      isPanningRef.current = false;
 
       // Stroke holds paint changes? Commit as a individual historic state
       if (strokeChangesRef.current && Object.keys(strokeChangesRef.current).length > 0) {
@@ -452,22 +563,23 @@ export default function App() {
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = 0.08;
-    const newScale = e.deltaY < 0 ? scale + zoomFactor : scale - zoomFactor;
-    setScale(Math.max(0.4, Math.min(2.5, newScale)));
+    const newScale = e.deltaY < 0 ? scaleRef.current + zoomFactor : scaleRef.current - zoomFactor;
+    scaleRef.current = Math.max(0.4, Math.min(2.5, newScale));
+    updateCameraTransform();
   };
 
   const handleZoomIn = () => {
-    setScale((prev) => Math.min(2.5, prev + 0.15));
+    scaleRef.current = Math.min(2.5, scaleRef.current + 0.15);
+    updateCameraTransform();
   };
 
   const handleZoomOut = () => {
-    setScale((prev) => Math.max(0.4, prev - 0.15));
+    scaleRef.current = Math.max(0.4, scaleRef.current - 0.15);
+    updateCameraTransform();
   };
 
   const handleResetCamera = () => {
-    setScale(1);
-    setPanX(0);
-    setPanY(0);
+    resetCamera();
   };
 
   // Prevent right-click context menu on workspace (for flawless panning)
@@ -614,11 +726,10 @@ export default function App() {
       setRadius(firstMap.radius);
       setCells(JSON.parse(JSON.stringify(firstMap.cells)));
       resetHistory(firstMap.cells, firstMap.radius);
+      setHoveredCellImperatively(null);
 
       // Reset camera view
-      setPanX(0);
-      setPanY(0);
-      setScale(1);
+      resetCamera();
       return true;
     } catch {
       return false;
@@ -685,8 +796,8 @@ export default function App() {
               重置視角
             </button>
             <div className="w-px h-4 bg-slate-200 mx-1" />
-            <div className="px-2 text-[11px] font-mono font-semibold text-slate-400">
-              {Math.round(scale * 100)}%
+            <div ref={scaleReadoutRef} className="px-2 text-[11px] font-mono font-semibold text-slate-400">
+              100%
             </div>
           </div>
 
@@ -742,44 +853,33 @@ export default function App() {
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
             當前格子座標探測
           </span>
-          {hoveredCell ? (
-            <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm flex flex-col space-y-1.5">
+          <div ref={inspectorContentRef} className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm flex flex-col space-y-1.5" style={{ display: "none" }}>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold text-indigo-600 font-mono">
-                  Axial: ({hoveredCell.q}, {hoveredCell.r})
-                </span>
-                <span className="text-[10px] font-mono text-slate-400">
-                  Cube: ({hoveredCell.q}, {hoveredCell.r}, {-hoveredCell.q - hoveredCell.r})
-                </span>
+                <span ref={inspectorAxialRef} className="text-xs font-bold text-indigo-600 font-mono" />
+                <span ref={inspectorCubeRef} className="text-[10px] font-mono text-slate-400" />
               </div>
 
               <div className="grid grid-cols-2 gap-1.5 text-xs">
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-400 text-[10px]">地形:</span>
-                  <span className="font-bold text-slate-700">{TERRAIN_CONFIGS[hoveredCell.terrain]?.label || hoveredCell.terrain}</span>
+                  <span ref={inspectorTerrainRef} className="font-bold text-slate-700" />
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-slate-400 text-[10px]">地標:</span>
-                  <span className="font-bold text-slate-700">{LANDMARK_CONFIGS[hoveredCell.landmark]?.label || hoveredCell.landmark}</span>
+                  <span ref={inspectorLandmarkRef} className="font-bold text-slate-700" />
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
                 <span className="text-slate-400 text-[10px]">風格:</span>
-                <span className="font-semibold text-slate-700" style={{ color: STYLE_CONFIGS[hoveredCell.style]?.borderColor }}>
-                  {STYLE_CONFIGS[hoveredCell.style]?.label}
-                </span>
+                <span ref={inspectorStyleRef} className="font-semibold text-slate-700" />
                 <span className="ml-auto text-slate-400 text-[10px]">v:</span>
-                <span className="font-mono font-semibold text-slate-700">
-                  {hoveredCell.terrain === TerrainType.NONE ? 0 : hoveredCell.v}
-                </span>
+                <span ref={inspectorVariantRef} className="font-mono font-semibold text-slate-700" />
               </div>
             </div>
-          ) : (
-            <div className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
-              將滑鼠移至地圖上即可看見座標資訊
-            </div>
-          )}
+          <div ref={inspectorEmptyRef} className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
+            將滑鼠移至地圖上即可看見座標資訊
+          </div>
 
         </div>
 
@@ -805,7 +905,7 @@ export default function App() {
             style={{ pointerEvents: "auto" }}
           >
             {/* Transform Group carrying Pan & Zoom settings */}
-            <g transform={`translate(${panX + (window.innerWidth - (window.innerWidth < 1024 ? 0 : 384)) / 2}, ${panY + window.innerHeight / 2}) scale(${scale})`}>
+            <g ref={cameraGroupRef} transform={getCameraTransform()}>
               {/* Outer radius circular boundary backing */}
               <circle
                 cx="0"
@@ -821,14 +921,12 @@ export default function App() {
               {/* Loop rendering each hex cell within radius boundaries */}
               {renderedCells.map((cell) => {
                 const key = `${cell.q},${cell.r}`;
-                const isHovered = hoveredCell?.q === cell.q && hoveredCell?.r === cell.r;
 
                 return (
                   <HexRenderer
                     key={key}
                     cell={cell}
                     size={cellSize}
-                    isHovered={isHovered}
                     isSelected={false}
                     onMouseEnter={handleHexMouseEnter}
                     onMouseLeave={handleHexMouseLeave}
@@ -836,6 +934,15 @@ export default function App() {
                   />
                 );
               })}
+
+              <polygon
+                ref={hoverOverlayRef}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="2.5"
+                strokeDasharray="4,2"
+                style={{ display: "none", pointerEvents: "none" }}
+              />
 
             </g>
           </svg>

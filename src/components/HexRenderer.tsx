@@ -12,7 +12,6 @@ interface HexRendererProps {
   cell: HexCell;
   size: number;
   isSelected?: boolean;
-  isHovered?: boolean;
   onMouseEnter: (e: React.MouseEvent, cell: HexCell) => void;
   onMouseLeave: (e: React.MouseEvent, cell: HexCell) => void;
   onMouseDown: (e: React.MouseEvent, cell: HexCell) => void;
@@ -22,7 +21,6 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   cell,
   size,
   isSelected,
-  isHovered,
   onMouseEnter,
   onMouseLeave,
   onMouseDown,
@@ -153,7 +151,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   // Determine standard hex styling
   const fillColor = hasTerrain ? tConfig.color : "transparent";
   const strokeColor = isSelected ? "#3b82f6" : sConfig.borderColor || tConfig.borderColor;
-  const strokeWidth = isSelected ? 3.5 : isHovered ? 2.5 : 1.2;
+  const strokeWidth = isSelected ? 3.5 : 1.2;
 
   return (
     <g
@@ -190,17 +188,6 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
         </text>
       )}
 
-      {/* Hover state outline overlay */}
-      {isHovered && (
-        <polygon
-          points={pointsStr}
-          fill="none"
-          stroke="#3b82f6"
-          strokeWidth="2.5"
-          strokeDasharray="4,2"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
     </g>
   );
 };
