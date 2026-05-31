@@ -12,18 +12,12 @@ interface HexRendererProps {
   cell: HexCell;
   size: number;
   isSelected?: boolean;
-  onMouseEnter: (e: React.MouseEvent, cell: HexCell) => void;
-  onMouseLeave: (e: React.MouseEvent, cell: HexCell) => void;
-  onMouseDown: (e: React.MouseEvent, cell: HexCell) => void;
 }
 
 const HexRendererComponent: React.FC<HexRendererProps> = ({
   cell,
   size,
   isSelected,
-  onMouseEnter,
-  onMouseLeave,
-  onMouseDown,
 }) => {
   const { q, r, terrain, landmark, style } = cell;
 
@@ -156,9 +150,6 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   return (
     <g
       id={`hex-g-${q}-${r}`}
-      onMouseEnter={(e) => onMouseEnter(e, cell)}
-      onMouseLeave={(e) => onMouseLeave(e, cell)}
-      onMouseDown={(e) => onMouseDown(e, cell)}
       className="cursor-pointer transition-all duration-150 select-none"
     >
       {/* Primary Hexagon Surface */}

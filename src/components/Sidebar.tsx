@@ -11,7 +11,6 @@ import {
   Redo2,
   Download,
   Upload,
-  Eraser,
   Grid,
   MapPin,
   Sparkles,
@@ -31,8 +30,8 @@ import {
 
 interface SidebarProps {
   // Painting Brush State
-  activeLayer: "terrain" | "landmark" | "style" | "eraser";
-  setActiveLayer: (layer: "terrain" | "landmark" | "style" | "eraser") => void;
+  activeLayer: "terrain" | "landmark" | "style";
+  setActiveLayer: (layer: "terrain" | "landmark" | "style") => void;
 
   selectedTerrain: TerrainType;
   setSelectedTerrain: (t: TerrainType) => void;
@@ -380,15 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onToggle={() => toggleGroup("brush")}
         >
           <div className="space-y-3">
-            {activeLayer === "eraser" && (
-              <div className="flex justify-end">
-                <span className="text-[11px] font-medium bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full border border-rose-100 flex items-center gap-1">
-                  <Eraser className="w-2.5 h-2.5" /> 橡皮擦模式
-                </span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-4 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
               <button
                 id="layer-btn-terrain"
                 onClick={() => setActiveLayer("terrain")}
@@ -424,18 +415,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Sparkles className="w-4 h-4" />
                 <span>風格</span>
-              </button>
-              <button
-                id="layer-btn-eraser"
-                onClick={() => setActiveLayer("eraser")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "eraser"
-                    ? "bg-rose-500 text-white shadow-inner"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <Eraser className="w-4 h-4" />
-                <span>清除</span>
               </button>
             </div>
           </div>
@@ -526,12 +505,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          {activeLayer === "eraser" && (
-            <div id="eraser-description" className="py-2 text-center text-slate-500">
-              <p className="text-xs">請點擊或拖曳畫筆抹除格子的屬性。</p>
-              <p className="text-[10px] text-slate-400 mt-1">這會將地形還原至平原，並移除地標與風格效果。</p>
-            </div>
-          )}
         </div>
         </CollapsibleGroup>
 

@@ -131,6 +131,33 @@ const getHexPointsString = (q: number, r: number, size: number) => {
     .join(" ");
 };
 
+const roundAxial = (q: number, r: number) => {
+  let cubeQ = Math.round(q);
+  let cubeR = Math.round(r);
+  let cubeS = Math.round(-q - r);
+
+  const qDiff = Math.abs(cubeQ - q);
+  const rDiff = Math.abs(cubeR - r);
+  const sDiff = Math.abs(cubeS - (-q - r));
+
+  if (qDiff > rDiff && qDiff > sDiff) {
+    cubeQ = -cubeR - cubeS;
+  } else if (rDiff > sDiff) {
+    cubeR = -cubeQ - cubeS;
+  } else {
+    cubeS = -cubeQ - cubeR;
+  }
+
+  return { q: cubeQ, r: cubeR };
+};
+
+const pixelToAxial = (x: number, y: number, size: number) => {
+  const r = -y / (1.5 * size);
+  const q = x / (Math.sqrt(3) * size) - r / 2;
+
+  return roundAxial(q, r);
+};
+
 export default function App() {
   // Grid Sizing state
   const [radius, setRadius] = useState<number>(DEFAULT_MAP_RADIUS);
@@ -140,6 +167,7 @@ export default function App() {
   const [cells, setCells] = useState<Record<string, HexCell>>(() => {
     return createEmptyCells(DEFAULT_MAP_RADIUS);
   });
+  const cellsRef = useRef<Record<string, HexCell>>(cells);
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
@@ -150,7 +178,7 @@ export default function App() {
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
 
   // Hot selection editing states
-  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "eraser">("terrain");
+  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style">("terrain");
   const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
@@ -168,6 +196,7 @@ export default function App() {
   const inspectorVariantRef = useRef<HTMLSpanElement | null>(null);
 
   // Dynamic camera refs avoid rerendering the map while panning or zooming.
+  const svgRef = useRef<SVGSVGElement | null>(null);
   const cameraGroupRef = useRef<SVGGElement | null>(null);
   const scaleReadoutRef = useRef<HTMLDivElement | null>(null);
   const scaleRef = useRef<number>(1);
@@ -181,14 +210,14 @@ export default function App() {
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   // High performance painting states
-  const [isMouseDown, setIsMouseDown] = useState<boolean>(false);
+  const isMouseDownRef = useRef<boolean>(false);
   const strokeChangesRef = useRef<Record<string, HexCell> | null>(null);
   const [showDemoHelp, setShowDemoHelp] = useState<boolean>(true);
 
   const getCameraTransform = useCallback(() => {
-    const sidebarWidth = window.innerWidth < 1024 ? 0 : 384;
-    const centerX = (window.innerWidth - sidebarWidth) / 2;
-    const centerY = window.innerHeight / 2;
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    const centerX = svgRect ? svgRect.width / 2 : window.innerWidth / 2;
+    const centerY = svgRect ? svgRect.height / 2 : window.innerHeight / 2;
 
     return `translate(${panXRef.current + centerX}, ${panYRef.current + centerY}) scale(${scaleRef.current})`;
   }, []);
@@ -270,6 +299,21 @@ export default function App() {
     updateInspector(cell);
   }, [updateHoverOverlay, updateInspector]);
 
+  const getCellFromPointer = useCallback((clientX: number, clientY: number): HexCell | null => {
+    const svgRect = svgRef.current?.getBoundingClientRect();
+    if (!svgRect) {
+      return null;
+    }
+
+    const centerX = svgRect.width / 2;
+    const centerY = svgRect.height / 2;
+    const mapX = (clientX - svgRect.left - centerX - panXRef.current) / scaleRef.current;
+    const mapY = (clientY - svgRect.top - centerY - panYRef.current) / scaleRef.current;
+    const { q, r } = pixelToAxial(mapX, mapY, cellSize);
+
+    return cellsRef.current[`${q},${r}`] ?? null;
+  }, [cellSize]);
+
   const getMapsWithCurrentSnapshot = useCallback((): AtlasMap[] => {
     return maps.map((map, index) => index === selectedMapIndex ? {
       ...map,
@@ -324,7 +368,8 @@ export default function App() {
     const targetMap = nextMaps[mapIndex];
     setMaps(nextMaps);
     setSelectedMapIndex(mapIndex);
-    setCells(JSON.parse(JSON.stringify(targetMap.cells)));
+    cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
+    setCells(cellsRef.current);
     setRadius(targetMap.radius);
     resetHistory(targetMap.cells, targetMap.radius);
     setHoveredCellImperatively(null);
@@ -341,7 +386,8 @@ export default function App() {
 
     setMaps([...nextMaps, nextMap]);
     setSelectedMapIndex(nextMaps.length);
-    setCells(JSON.parse(JSON.stringify(nextMap.cells)));
+    cellsRef.current = JSON.parse(JSON.stringify(nextMap.cells));
+    setCells(cellsRef.current);
     setRadius(nextMap.radius);
     resetHistory(nextMap.cells, nextMap.radius);
     setHoveredCellImperatively(null);
@@ -359,7 +405,8 @@ export default function App() {
 
     setMaps([...nextMaps, duplicatedMap]);
     setSelectedMapIndex(nextMaps.length);
-    setCells(JSON.parse(JSON.stringify(duplicatedMap.cells)));
+    cellsRef.current = JSON.parse(JSON.stringify(duplicatedMap.cells));
+    setCells(cellsRef.current);
     setRadius(duplicatedMap.radius);
     resetHistory(duplicatedMap.cells, duplicatedMap.radius);
     setHoveredCellImperatively(null);
@@ -377,7 +424,8 @@ export default function App() {
 
     setMaps(nextMaps);
     setSelectedMapIndex(nextSelectedIndex);
-    setCells(JSON.parse(JSON.stringify(targetMap.cells)));
+    cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
+    setCells(cellsRef.current);
     setRadius(targetMap.radius);
     resetHistory(targetMap.cells, targetMap.radius);
     setHoveredCellImperatively(null);
@@ -397,10 +445,12 @@ export default function App() {
     if (historyIndex > 0) {
       const prevIndex = historyIndex - 1;
       const targetState = history[prevIndex];
-      setCells(JSON.parse(JSON.stringify(targetState.cells)));
+      cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
+      setCells(cellsRef.current);
       setRadius(targetState.radius);
       updateCurrentMapSnapshot(targetState.cells, targetState.radius);
       setHistoryIndex(prevIndex);
+      setHoveredCellImperatively(null);
     }
   }, [historyIndex, history, updateCurrentMapSnapshot]);
 
@@ -409,10 +459,12 @@ export default function App() {
     if (historyIndex < history.length - 1) {
       const nextIndex = historyIndex + 1;
       const targetState = history[nextIndex];
-      setCells(JSON.parse(JSON.stringify(targetState.cells)));
+      cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
+      setCells(cellsRef.current);
       setRadius(targetState.radius);
       updateCurrentMapSnapshot(targetState.cells, targetState.radius);
       setHistoryIndex(nextIndex);
+      setHoveredCellImperatively(null);
     }
   }, [historyIndex, history, updateCurrentMapSnapshot]);
 
@@ -440,9 +492,11 @@ export default function App() {
       }
     }
     pushToHistory(newCells, newRadius);
+    cellsRef.current = newCells;
     setCells(newCells);
     setRadius(newRadius);
     updateCurrentMapSnapshot(newCells, newRadius);
+    setHoveredCellImperatively(null);
     
     // Auto center map camera
     resetCamera();
@@ -451,24 +505,26 @@ export default function App() {
   // Cell Painter logic
   const paintCell = useCallback((targetCell: HexCell) => {
     const key = `${targetCell.q},${targetCell.r}`;
-    const previous = cells[key];
+    const previous = cellsRef.current[key];
     if (!previous) return;
 
     let updatedCell = { ...previous };
 
-    if (activeLayer === "eraser") {
-      updatedCell.terrain = TerrainType.PLAIN;
-      updatedCell.landmark = LandmarkType.NONE;
-      updatedCell.style = StyleVariant.NORMAL;
-    } else if (activeLayer === "terrain") {
+    if (activeLayer === "terrain") {
       updatedCell.terrain = selectedTerrain;
       if (selectedTerrain === TerrainType.NONE) {
         updatedCell.landmark = LandmarkType.NONE;
         updatedCell.style = StyleVariant.NORMAL;
       }
     } else if (activeLayer === "landmark") {
+      if (previous.terrain === TerrainType.NONE) {
+        return;
+      }
       updatedCell.landmark = selectedLandmark;
     } else if (activeLayer === "style") {
+      if (previous.terrain === TerrainType.NONE) {
+        return;
+      }
       updatedCell.style = selectedStyle;
     }
 
@@ -485,7 +541,8 @@ export default function App() {
       return;
     }
 
-    const nextCells = { ...cells, [key]: updatedCell };
+    const nextCells = { ...cellsRef.current, [key]: updatedCell };
+    cellsRef.current = nextCells;
     setCells(nextCells);
     updateCurrentMapSnapshot(nextCells, radius);
 
@@ -495,60 +552,57 @@ export default function App() {
     }
   }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, updateCurrentMapSnapshot]);
 
-  // Pointer triggers
-  const handleHexMouseDown = useCallback((e: React.MouseEvent, cell: HexCell) => {
-    // Only paint with left clicks
-    if (e.button !== 0) return;
-    setIsMouseDown(true);
-    // Begin a paint transaction
-    strokeChangesRef.current = {};
-    paintCell(cell);
-  }, [paintCell]);
-
-  const handleHexMouseEnter = useCallback((e: React.MouseEvent, cell: HexCell) => {
-    setHoveredCellImperatively(cell);
-    if (isMouseDown) {
-      paintCell(cell);
-    }
-  }, [isMouseDown, paintCell, setHoveredCellImperatively]);
-
-  const handleHexMouseLeave = useCallback((e: React.MouseEvent, cell: HexCell) => {
-    const currentCell = hoveredCellRef.current;
-    if (currentCell?.q === cell.q && currentCell?.r === cell.r) {
-      setHoveredCellImperatively(null);
-    }
-  }, [setHoveredCellImperatively]);
-
   // Canvas Drag/Pan
-  const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    // Right click or Middle click or Left click while targeting background allows dragging
-    const targetElement = e.target as SVGElement;
-    const isBackground = targetElement.classList.contains("background-grip") || targetElement.tagName === "svg";
-    
-    if (e.button === 2 || e.button === 1 || isBackground) {
+  const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    const targetCell = getCellFromPointer(e.clientX, e.clientY);
+
+    if (e.button === 0 && targetCell) {
+      isMouseDownRef.current = true;
+      strokeChangesRef.current = {};
+      setHoveredCellImperatively(targetCell);
+      paintCell(targetCell);
+      e.preventDefault();
+      return;
+    }
+
+    if (e.button === 2 || e.button === 1 || e.button === 0) {
       isPanningRef.current = true;
       panStartRef.current = { x: e.clientX - panXRef.current, y: e.clientY - panYRef.current };
       e.preventDefault();
     }
-  };
+  }, [getCellFromPointer, paintCell, setHoveredCellImperatively]);
 
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
       panXRef.current = e.clientX - panStartRef.current.x;
       panYRef.current = e.clientY - panStartRef.current.y;
       updateCameraTransform();
+      return;
     }
-  };
+
+    const targetCell = getCellFromPointer(e.clientX, e.clientY);
+    const currentCell = hoveredCellRef.current;
+    if (targetCell?.q !== currentCell?.q || targetCell?.r !== currentCell?.r) {
+      setHoveredCellImperatively(targetCell);
+    }
+    if (isMouseDownRef.current && targetCell) {
+      paintCell(targetCell);
+    }
+  }, [getCellFromPointer, paintCell, setHoveredCellImperatively, updateCameraTransform]);
+
+  const handleCanvasMouseLeave = useCallback(() => {
+    setHoveredCellImperatively(null);
+  }, [setHoveredCellImperatively]);
 
   // Window mouseup listener terminates active states and commits history
   useEffect(() => {
     const handleGlobalMouseUp = () => {
-      setIsMouseDown(false);
+      isMouseDownRef.current = false;
       isPanningRef.current = false;
 
       // Stroke holds paint changes? Commit as a individual historic state
       if (strokeChangesRef.current && Object.keys(strokeChangesRef.current).length > 0) {
-        pushToHistory(cells, radius);
+        pushToHistory(cellsRef.current, radius);
       }
       strokeChangesRef.current = null;
     };
@@ -690,7 +744,10 @@ export default function App() {
       [TerrainType.LOWLAND]: 0,
     } as Record<TerrainType, number>
   );
-  const renderedCells = useMemo(() => Object.values(cells) as HexCell[], [cells]);
+  const renderedCells = useMemo(
+    () => (Object.values(cells) as HexCell[]).filter((cell) => cell.terrain !== TerrainType.NONE),
+    [cells]
+  );
 
   // File download helper
   const handleExportJSON = () => {
@@ -724,7 +781,8 @@ export default function App() {
       setMaps(importedMaps);
       setSelectedMapIndex(0);
       setRadius(firstMap.radius);
-      setCells(JSON.parse(JSON.stringify(firstMap.cells)));
+      cellsRef.current = JSON.parse(JSON.stringify(firstMap.cells));
+      setCells(cellsRef.current);
       resetHistory(firstMap.cells, firstMap.radius);
       setHoveredCellImperatively(null);
 
@@ -889,6 +947,7 @@ export default function App() {
           className="w-full h-full relative overflow-hidden bg-slate-950 flex items-center justify-center cursor-all-scroll active:cursor-grabbing select-none"
           onMouseDown={handleCanvasMouseDown}
           onMouseMove={handleCanvasMouseMove}
+          onMouseLeave={handleCanvasMouseLeave}
           onWheel={handleWheel}
           onContextMenu={handleContextMenu}
         >
@@ -900,6 +959,7 @@ export default function App() {
 
           {/* Primary SVG Vector workspace content */}
           <svg
+            ref={svgRef}
             id="hex-editor-svg"
             className="w-full h-full drop-shadow-2xl transition-transform duration-75 ease-out select-none"
             style={{ pointerEvents: "auto" }}
@@ -928,9 +988,6 @@ export default function App() {
                     cell={cell}
                     size={cellSize}
                     isSelected={false}
-                    onMouseEnter={handleHexMouseEnter}
-                    onMouseLeave={handleHexMouseLeave}
-                    onMouseDown={handleHexMouseDown}
                   />
                 );
               })}
