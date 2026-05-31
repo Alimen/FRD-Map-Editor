@@ -51,10 +51,10 @@ export const TERRAIN_CONFIGS: Record<TerrainType, TerrainConfig> = {
   [TerrainType.HILL]: {
     type: TerrainType.HILL,
     label: "丘陵",
-    color: "#f4db9a",
-    borderColor: "#c1a55f",
-    accentColor: "#8c7233",
-    bgGradient: "from-[#faeac1] to-[#eedc9a]",
+    color: "#deeb71",
+    borderColor: "#8fb84f",
+    accentColor: "#5f7f2c",
+    bgGradient: "from-[#e3f6ad] to-[#bfdc75]",
   },
   [TerrainType.MOUNTAIN]: {
     type: TerrainType.MOUNTAIN,
@@ -67,10 +67,10 @@ export const TERRAIN_CONFIGS: Record<TerrainType, TerrainConfig> = {
   [TerrainType.LOWLAND]: {
     type: TerrainType.LOWLAND,
     label: "窪地",
-    color: "#acd7ec",
-    borderColor: "#5790ab",
-    accentColor: "#205973",
-    bgGradient: "from-[#c2e7f9] to-[#8ac3dd]",
+    color: "#5ecc9e",
+    borderColor: "#1f8068",
+    accentColor: "#145846",
+    bgGradient: "from-[#45c6a2] to-[#218f72]",
   },
 };
 
@@ -78,32 +78,27 @@ export const LANDMARK_CONFIGS: Record<LandmarkType, LandmarkConfig> = {
   [LandmarkType.NONE]: {
     type: LandmarkType.NONE,
     label: "無建築",
-    iconName: "none",
-    description: "純淨的野外，沒有地標建築。",
+    iconName: "none"
   },
   [LandmarkType.MAIN_DUNGEON]: {
     type: LandmarkType.MAIN_DUNGEON,
     label: "大地城",
-    iconName: "Castle",
-    description: "龐大、幽深且充滿危險的古代魔窟。",
+    iconName: "Castle"
   },
   [LandmarkType.SUB_DUNGEON]: {
     type: LandmarkType.SUB_DUNGEON,
     label: "小地城",
-    iconName: "Skull",
-    description: "小型秘境或被遺忘的地下遺跡。",
+    iconName: "Skull"
   },
   [LandmarkType.MAIN_CAMP]: {
     type: LandmarkType.MAIN_CAMP,
     label: "大營地",
-    iconName: "Tent",
-    description: "防禦堅固的要塞軍事大本營。",
+    iconName: "Tent"
   },
   [LandmarkType.SUB_CAMP]: {
     type: LandmarkType.SUB_CAMP,
     label: "小營地",
-    iconName: "FlameKindling",
-    description: "斥候營火或冒險者的臨時小歇息地。",
+    iconName: "FlameKindling"
   },
 };
 
@@ -120,11 +115,11 @@ export const STYLE_CONFIGS: Record<StyleVariant, StyleConfig> = {
   [StyleVariant.DEMONIC]: {
     type: StyleVariant.DEMONIC,
     label: "惡魔的",
-    glowColor: "rgba(239, 68, 68, 0.75)",
-    textColor: "text-red-700",
-    bannerColor: "bg-red-950 text-red-200 border-red-500",
-    accentColor: "rgba(220, 38, 38, 0.4)",
-    borderColor: "#dc2626",
+    glowColor: "rgba(245, 158, 11, 0.75)",
+    textColor: "text-amber-700",
+    bannerColor: "bg-amber-950 text-amber-200 border-amber-500",
+    accentColor: "rgba(217, 119, 6, 0.4)",
+    borderColor: "#d97706",
   },
   [StyleVariant.LOVECRAFTIAN]: {
     type: StyleVariant.LOVECRAFTIAN,
@@ -147,10 +142,10 @@ export const STYLE_CONFIGS: Record<StyleVariant, StyleConfig> = {
   [StyleVariant.DRACONIC]: {
     type: StyleVariant.DRACONIC,
     label: "龍族的",
-    glowColor: "rgba(245, 158, 11, 0.75)",
-    textColor: "text-amber-700",
-    bannerColor: "bg-amber-950 text-amber-200 border-amber-500",
-    accentColor: "rgba(217, 119, 6, 0.4)",
-    borderColor: "#d97706",
+    glowColor: "rgba(239, 68, 68, 0.75)",
+    textColor: "text-red-700",
+    bannerColor: "bg-red-950 text-red-200 border-red-500",
+    accentColor: "rgba(220, 38, 38, 0.4)",
+    borderColor: "#dc2626",
   },
 };

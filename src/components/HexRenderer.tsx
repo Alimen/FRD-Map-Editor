@@ -146,6 +146,9 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   const fillColor = hasTerrain ? tConfig.color : "transparent";
   const strokeColor = isSelected ? "#3b82f6" : sConfig.borderColor || tConfig.borderColor;
   const strokeWidth = isSelected ? 3.5 : 1.2;
+  const hasStyleMarker = style !== StyleVariant.NORMAL;
+  const styleRingRadius = size * 0.78;
+  const styleRingDash = `${Math.max(3, size * 0.09)} ${Math.max(2, size * 0.06)}`;
 
   return (
     <g
@@ -162,6 +165,22 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
         strokeLinejoin="round"
         className="transition-colors duration-200"
       />
+
+      {/* Style layer marker: a dashed inner ring that stays clear of center landmarks. */}
+      {hasTerrain && hasStyleMarker && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={styleRingRadius}
+          fill="none"
+          stroke={sConfig.borderColor}
+          strokeWidth={Math.max(1.1, size * 0.032)}
+          strokeDasharray={styleRingDash}
+          strokeLinecap="round"
+          opacity={0.86}
+          className="pointer-events-none"
+        />
+      )}
 
       {/* Main interactive/gorgeous landmark (castle, tower, camp) */}
       {hasTerrain && renderLandmarks()}

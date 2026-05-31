@@ -248,10 +248,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Compass className="w-5 h-5 animate-pulse" />
         </div>
         <div>
-          <h1 className="text-lg font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
-            FRD 地圖編輯器
-          </h1>
-          <p className="text-[11px] font-mono text-slate-400 font-medium">POINT TOP • AXIAL COORDINATES</p>
+          <h1 className="text-lg leading-tight font-bold text-slate-800 tracking-tight flex items-center gap-1.5">
+            FRD 地圖編輯器</h1>
+          <a
+            href="https://github.com/Alimen/FRD-Map-Editor"
+            target="_blank"
+            rel="noreferrer"
+            className="block text-[11px] leading-tight font-mono text-slate-400 hover:text-indigo-600 font-medium transition-colors"
+          >https://github.com/Alimen/FRD-Map-Editor
+          </a>
         </div>
       </div>
 

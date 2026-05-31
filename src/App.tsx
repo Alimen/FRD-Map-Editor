@@ -39,6 +39,10 @@ const createCells = (radius: number, terrain: TerrainType): Record<string, HexCe
 
 const createEmptyCells = (radius: number): Record<string, HexCell> => createCells(radius, TerrainType.PLAIN);
 const createNoTerrainCells = (radius: number): Record<string, HexCell> => createCells(radius, TerrainType.NONE);
+const createNewMapCells = (): Record<string, HexCell> => ({
+  ...createNoTerrainCells(DEFAULT_MAP_RADIUS),
+  ...createEmptyCells(NEW_MAP_FILL_RADIUS),
+});
 
 const terrainByCode = [
   TerrainType.PLAIN,
@@ -68,7 +72,8 @@ const landmarkToCode = new Map<LandmarkType, number>(landmarkByCode.map((type, c
 const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) => [type, code]));
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
-const DEFAULT_MAP_RADIUS = 2;
+const DEFAULT_MAP_RADIUS = 30;
+const NEW_MAP_FILL_RADIUS = 3;
 const MAX_MAP_RADIUS = 40;
 const MAX_TILE_VARIANT = 30;
 
@@ -185,14 +190,14 @@ export default function App() {
 
   // Hex Cell State Map (Key is "q,r")
   const [cells, setCells] = useState<Record<string, HexCell>>(() => {
-    return createEmptyCells(DEFAULT_MAP_RADIUS);
+    return createNewMapCells();
   });
   const cellsRef = useRef<Record<string, HexCell>>(cells);
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
       radius: DEFAULT_MAP_RADIUS,
-      cells: createEmptyCells(DEFAULT_MAP_RADIUS),
+      cells: createNewMapCells(),
     },
   ]);
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
@@ -357,7 +362,7 @@ export default function App() {
 
   // Initialize History with current state
   useEffect(() => {
-    const initialState = { cells: createEmptyCells(DEFAULT_MAP_RADIUS), radius: DEFAULT_MAP_RADIUS };
+    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS };
     setHistory([initialState]);
     setHistoryIndex(0);
   }, []);
@@ -401,7 +406,7 @@ export default function App() {
     const nextMap: AtlasMap = {
       id: getNextMapId(nextMaps),
       radius: DEFAULT_MAP_RADIUS,
-      cells: createEmptyCells(DEFAULT_MAP_RADIUS),
+      cells: createNewMapCells(),
     };
 
     setMaps([...nextMaps, nextMap]);
