@@ -67,7 +67,7 @@ const landmarkToCode = new Map<LandmarkType, number>(landmarkByCode.map((type, c
 const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) => [type, code]));
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
-const DEFAULT_MAP_RADIUS = 6;
+const DEFAULT_MAP_RADIUS = 2;
 const MAX_TILE_VARIANT = 30;
 
 const rollTileVariant = () => Math.floor(Math.random() * (MAX_TILE_VARIANT + 1));
