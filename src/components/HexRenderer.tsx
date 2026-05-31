@@ -18,7 +18,7 @@ interface HexRendererProps {
   onMouseDown: (e: React.MouseEvent, cell: HexCell) => void;
 }
 
-export const HexRenderer: React.FC<HexRendererProps> = ({
+const HexRendererComponent: React.FC<HexRendererProps> = ({
   cell,
   size,
   isSelected,
@@ -54,87 +54,6 @@ export const HexRenderer: React.FC<HexRendererProps> = ({
       return `${px},${py}`;
     })
     .join(" ");
-
-  // Custom inner SVGs per Terrain
-  const renderTerrainDetails = () => {
-    switch (terrain) {
-      case TerrainType.HILL:
-        return (
-          <g stroke={tConfig.accentColor} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.8">
-            {/* Draw layered hill lines inside coordinates relative to (cx, cy) */}
-            <path d={`M ${cx - size * 0.4},${cy + size * 0.15} Q ${cx - size * 0.2},${cy - size * 0.1} ${cx},${cy + size * 0.15}`} />
-            <path d={`M ${cx - size * 0.1},${cy + size * 0.25} Q ${cx + size * 0.15},${cy} ${cx + size * 0.4},${cy + size * 0.25}`} />
-            <path d={`M ${cx - size * 0.25},${cy - size * 0.15} Q ${cx - size * 0.1},${cy - size * 0.25} ${cx + size * 0.05},${cy - size * 0.15}`} />
-          </g>
-        );
-      case TerrainType.MOUNTAIN:
-        return (
-          <g stroke={tConfig.accentColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
-            {/* Main Peak */}
-            <polygon
-              points={`
-                ${cx - size * 0.45},${cy + size * 0.3} 
-                ${cx},${cy - size * 0.4} 
-                ${cx + size * 0.45},${cy + size * 0.3}
-              `}
-              fill={tConfig.color}
-              filter="brightness(0.95)"
-            />
-            {/* Main Peak Shadow Shading on right half */}
-            <polygon
-              points={`
-                ${cx},${cy - size * 0.4} 
-                ${cx + size * 0.45},${cy + size * 0.3} 
-                ${cx},${cy + size * 0.3}
-              `}
-              fill={tConfig.accentColor}
-              opacity="0.15"
-            />
-            {/* Highlight Ridge Line */}
-            <line x1={cx} y1={cy - size * 0.4} x2={cx} y2={cy + size * 0.3} />
-
-            {/* Behind / Subsidiary Peak */}
-            <polygon
-              points={`
-                ${cx - size * 0.5},${cy + size * 0.3} 
-                ${cx - size * 0.25},${cy - size * 0.1} 
-                ${cx},${cy + size * 0.3}
-              `}
-              fill={tConfig.color}
-              filter="brightness(0.9)"
-            />
-            <line x1={cx - size * 0.25} y1={cy - size * 0.1} x2={cx - size * 0.25} y2={cy + size * 0.3} />
-          </g>
-        );
-      case TerrainType.LOWLAND:
-        return (
-          <g stroke={tConfig.accentColor} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.75">
-            {/* Water waves */}
-            <path d={`M ${cx - size * 0.35},${cy - size * 0.15} C ${cx - size * 0.15},${cy - size * 0.2} ${cx - size * 0.15},${cy - size * 0.1} ${cx},${cy - size * 0.15} S ${cx + size * 0.15},${cy - size * 0.1} ${cx + size * 0.35},${cy - size * 0.15}`} />
-            <path d={`M ${cx - size * 0.25},${cy + size * 0.15} C ${cx - size * 0.1},${cy + size * 0.1} ${cx - size * 0.1},${cy + size * 0.2} ${cx + size * 0.05},${cy + size * 0.15} S ${cx + size * 0.2},${cy + size * 0.2} ${cx + size * 0.25},${cy + size * 0.15}`} />
-            {/* Tiny reed grass */}
-            <line x1={cx - size * 0.15} y1={cy - size * 0.3} x2={cx - size * 0.13} y2={cy - size * 0.45} />
-            <line x1={cx - size * 0.1} y1={cy - size * 0.3} x2={cx - size * 0.05} y2={cy - size * 0.42} />
-          </g>
-        );
-      case TerrainType.PLAIN:
-      default:
-        return (
-          <g stroke={tConfig.accentColor} strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.65">
-            {/* Small grass tufts */}
-            <path d={`M ${cx - size * 0.25},${cy - size * 0.1} L ${cx - size * 0.28},${cy - size * 0.25}`} />
-            <path d={`M ${cx - size * 0.25},${cy - size * 0.1} L ${cx - size * 0.22},${cy - size * 0.22}`} />
-
-            <path d={`M ${cx + size * 0.2},${cy + size * 0.1} L ${cx + size * 0.16},${cy - size * 0.05}`} />
-            <path d={`M ${cx + size * 0.2},${cy + size * 0.1} L ${cx + size * 0.24},${cy - size * 0.03}`} />
-            <path d={`M ${cx + size * 0.2},${cy + size * 0.1} L ${cx + size * 0.28},${cy + size * 0.05}`} />
-
-            <path d={`M ${cx - size * 0.05},${cy + size * 0.25} L ${cx - size * 0.08},${cy + size * 0.12}`} />
-            <path d={`M ${cx - size * 0.05},${cy + size * 0.25} L ${cx - size * 0.02},${cy + size * 0.15}`} />
-          </g>
-        );
-    }
-  };
 
   // Custom high fidelity visual renderings for Landmarks
   const renderLandmarks = () => {
@@ -231,90 +150,10 @@ export const HexRenderer: React.FC<HexRendererProps> = ({
     }
   };
 
-  // Render extra graphic overlay representing Style Variants
-  const renderStyleOverlays = () => {
-    switch (style) {
-      case StyleVariant.DEMONIC:
-        return (
-          <g style={{ pointerEvents: "none" }}>
-            {/* Fiery demonic cracks or core shadow */}
-            <circle cx={cx} cy={cy} r={size * 0.72} fill="none" stroke="#ef4444" strokeWidth="1" strokeDasharray="2,3" opacity="0.6" />
-            <path
-              d={`M ${cx - size * 0.21},${cy - size * 0.5} L ${cx - size * 0.25},${cy - size * 0.65} M ${cx + size * 0.21},${cy - size * 0.5} L ${cx + size * 0.25},${cy - size * 0.65}`}
-              stroke="#ef4444"
-              strokeWidth="2"
-              strokeLinecap="round"
-              opacity="0.95"
-            />
-          </g>
-        );
-      case StyleVariant.LOVECRAFTIAN:
-        return (
-          <g style={{ pointerEvents: "none" }} opacity="0.8">
-            {/* Concentric mystical runic loops and thin purple tentacles */}
-            <circle cx={cx} cy={cy} r={size * 0.8} fill="none" stroke="#a855f7" strokeWidth="1" strokeDasharray="4,8" />
-            <path d={`M ${cx - size * 0.6},${cy - size * 0.3} Q ${cx - size * 0.75},${cy - size * 0.2} ${cx - size * 0.65},${cy}`} fill="none" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" />
-            <path d={`M ${cx + size * 0.6},${cy + size * 0.3} Q ${cx + size * 0.75},${cy + size * 0.2} ${cx + size * 0.65},${cy}`} fill="none" stroke="#c084fc" strokeWidth="1.5" strokeLinecap="round" />
-            <circle cx={cx} cy={cy} r="2" fill="#c084fc" filter="drop-shadow(0 0 2px #d8b4fe)" />
-          </g>
-        );
-      case StyleVariant.UNDEAD:
-        return (
-          <g style={{ pointerEvents: "none" }} opacity="0.75">
-            {/* Ghostly spectral green mists or tiny tombstones */}
-            <path
-              d={`
-                M ${cx - size * 0.55},${cy + size * 0.1} 
-                Q ${cx - size * 0.3},${cy + size * 0.4} ${cx},${cy + size * 0.1}
-                T ${cx + size * 0.55},${cy + size * 0.2}
-              `}
-              fill="none"
-              stroke="#14b8a6"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeDasharray="2,5"
-            />
-            {/* Tiny tombstone if no landmark, or graves marker */}
-            {landmark === LandmarkType.NONE && (
-              <path
-                d={`M ${cx + size * 0.2},${cy - size * 0.1} v -6 h 4 v 6 h -4 M ${cx + size * 0.22},${cy - size * 0.15} h -4`}
-                fill="none"
-                stroke="#9ca3af"
-                strokeWidth="1"
-              />
-            )}
-          </g>
-        );
-      case StyleVariant.DRACONIC:
-        return (
-          <g style={{ pointerEvents: "none" }} opacity="0.8">
-            {/* Golden wings / bronze dragon horns trim near top */}
-            <path
-              d={`M ${cx - size * 0.4},${cy - size * 0.6} L ${cx},${cy - size * 0.7} L ${cx + size * 0.4},${cy - size * 0.6}`}
-              fill="none"
-              stroke="#fbbf24"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            {/* Scale pattern on the top portion of hex */}
-            <path d={`M ${cx - 5},${cy - size * 0.3} Q ${cx},${cy - size * 0.3 - 3} ${cx + 5},${cy - size * 0.3}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
-            <path d={`M ${cx - 10},${cy - size * 0.2} Q ${cx - 5},${cy - size * 0.2 - 3} ${cx},${cy - size * 0.2}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
-            <path d={`M ${cx},${cy - size * 0.2} Q ${cx + 5},${cy - size * 0.2 - 3} ${cx + 10},${cy - size * 0.2}`} fill="none" stroke="#f59e0b" strokeWidth="1" />
-          </g>
-        );
-      case StyleVariant.NORMAL:
-      default:
-        return null;
-    }
-  };
-
   // Determine standard hex styling
-  const fillUrl = hasTerrain ? `url(#grad-${terrain})` : "transparent";
+  const fillColor = hasTerrain ? tConfig.color : "transparent";
   const strokeColor = isSelected ? "#3b82f6" : sConfig.borderColor || tConfig.borderColor;
   const strokeWidth = isSelected ? 3.5 : isHovered ? 2.5 : 1.2;
-
-  // Add filters or glows based on StyleVariant
-  const hasGlow = hasTerrain && style !== StyleVariant.NORMAL;
 
   return (
     <g
@@ -324,44 +163,16 @@ export const HexRenderer: React.FC<HexRendererProps> = ({
       onMouseDown={(e) => onMouseDown(e, cell)}
       className="cursor-pointer transition-all duration-150 select-none"
     >
-      {/* Decorative Glow Drop Shadow for styles */}
-      {hasGlow && (
-        <polygon
-          points={pointsStr}
-          fill="none"
-          stroke={sConfig.borderColor === "rgba(100, 116, 139, 0.4)" ? "#ffffff" : sConfig.borderColor}
-          strokeWidth={strokeWidth + 4}
-          opacity="0.3"
-          style={{ filter: `blur(4px)` }}
-        />
-      )}
-
       {/* Primary Hexagon Surface */}
       <polygon
         id={`hex-polygon-${q}-${r}`}
         points={pointsStr}
-        fill={fillUrl}
+        fill={fillColor}
         stroke={hasTerrain ? strokeColor : "transparent"}
         strokeWidth={strokeWidth}
         strokeLinejoin="round"
         className="transition-colors duration-200"
       />
-
-      {/* Light Inner Shadow or Accent lines based on Style */}
-      {hasTerrain && style !== StyleVariant.NORMAL && (
-        <polygon
-          points={pointsStr}
-          fill={sConfig.accentColor}
-          opacity="0.12"
-          style={{ pointerEvents: "none" }}
-        />
-      )}
-
-      {/* Terrain features (grass, hill lines, mountain, wavy water) */}
-      {hasTerrain && renderTerrainDetails()}
-
-      {/* Style variant special elements (cracks, cosmic marks, mists, gold scales) */}
-      {hasTerrain && renderStyleOverlays()}
 
       {/* Main interactive/gorgeous landmark (castle, tower, camp) */}
       {hasTerrain && renderLandmarks()}
@@ -393,3 +204,5 @@ export const HexRenderer: React.FC<HexRendererProps> = ({
     </g>
   );
 };
+
+export const HexRenderer = React.memo(HexRendererComponent);

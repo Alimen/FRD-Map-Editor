@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { HexCell, TerrainType, LandmarkType, StyleVariant } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
@@ -387,27 +387,27 @@ export default function App() {
   }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, updateCurrentMapSnapshot]);
 
   // Pointer triggers
-  const handleHexMouseDown = (e: React.MouseEvent, cell: HexCell) => {
+  const handleHexMouseDown = useCallback((e: React.MouseEvent, cell: HexCell) => {
     // Only paint with left clicks
     if (e.button !== 0) return;
     setIsMouseDown(true);
     // Begin a paint transaction
     strokeChangesRef.current = {};
     paintCell(cell);
-  };
+  }, [paintCell]);
 
-  const handleHexMouseEnter = (e: React.MouseEvent, cell: HexCell) => {
+  const handleHexMouseEnter = useCallback((e: React.MouseEvent, cell: HexCell) => {
     setHoveredCell(cell);
     if (isMouseDown) {
       paintCell(cell);
     }
-  };
+  }, [isMouseDown, paintCell]);
 
-  const handleHexMouseLeave = (e: React.MouseEvent, cell: HexCell) => {
-    if (hoveredCell?.q === cell.q && hoveredCell?.r === cell.r) {
-      setHoveredCell(null);
-    }
-  };
+  const handleHexMouseLeave = useCallback((e: React.MouseEvent, cell: HexCell) => {
+    setHoveredCell((currentCell) => (
+      currentCell?.q === cell.q && currentCell?.r === cell.r ? null : currentCell
+    ));
+  }, []);
 
   // Canvas Drag/Pan
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
@@ -578,6 +578,7 @@ export default function App() {
       [TerrainType.LOWLAND]: 0,
     } as Record<TerrainType, number>
   );
+  const renderedCells = useMemo(() => Object.values(cells) as HexCell[], [cells]);
 
   // File download helper
   const handleExportJSON = () => {
@@ -803,27 +804,6 @@ export default function App() {
             className="w-full h-full drop-shadow-2xl transition-transform duration-75 ease-out select-none"
             style={{ pointerEvents: "auto" }}
           >
-            {/* Embedded Definitions & Gradients for High fidelity visualization */}
-            <defs>
-              {/* Terrain Gradients */}
-              <linearGradient id={`grad-${TerrainType.PLAIN}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#d2f1b0" />
-                <stop offset="100%" stopColor="#a9dd7f" />
-              </linearGradient>
-              <linearGradient id={`grad-${TerrainType.HILL}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#fae7b9" />
-                <stop offset="100%" stopColor="#dfbf75" />
-              </linearGradient>
-              <linearGradient id={`grad-${TerrainType.MOUNTAIN}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#ecdfe8" />
-                <stop offset="100%" stopColor="#9a9fade" />
-              </linearGradient>
-              <linearGradient id={`grad-${TerrainType.LOWLAND}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#bce7fb" />
-                <stop offset="100%" stopColor="#7cbdd8" />
-              </linearGradient>
-            </defs>
-
             {/* Transform Group carrying Pan & Zoom settings */}
             <g transform={`translate(${panX + (window.innerWidth - (window.innerWidth < 1024 ? 0 : 384)) / 2}, ${panY + window.innerHeight / 2}) scale(${scale})`}>
               {/* Outer radius circular boundary backing */}
@@ -839,7 +819,7 @@ export default function App() {
               />
 
               {/* Loop rendering each hex cell within radius boundaries */}
-              {(Object.values(cells) as HexCell[]).map((cell) => {
+              {renderedCells.map((cell) => {
                 const key = `${cell.q},${cell.r}`;
                 const isHovered = hoveredCell?.q === cell.q && hoveredCell?.r === cell.r;
 
