@@ -20,3 +20,9 @@
 
 本專案使用 Google AI Studio 建立六角格編輯的基礎架構，後續再由 OpenAI Codex 與人力協作而成。
 
+## License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
+
+This project uses third-party open-source dependencies, each of which remains under its own license.
+Notable runtime dependencies include React (MIT), React DOM (MIT), and lucide-react (ISC).
