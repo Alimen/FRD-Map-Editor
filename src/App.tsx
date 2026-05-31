@@ -69,7 +69,7 @@ const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) =
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
 const DEFAULT_MAP_RADIUS = 2;
-const MAX_MAP_RADIUS = 30;
+const MAX_MAP_RADIUS = 40;
 const MAX_TILE_VARIANT = 30;
 
 const rollTileVariant = () => Math.floor(Math.random() * (MAX_TILE_VARIANT + 1));
@@ -126,6 +126,26 @@ const getHexPointsString = (q: number, r: number, size: number) => {
     .map((angle) => {
       const px = cx + size * Math.cos(angle);
       const py = cy + size * Math.sin(angle);
+      return `${px},${py}`;
+    })
+    .join(" ");
+};
+
+const getMapBoundaryPointsString = (radius: number, size: number) => {
+  const boundaryCells = [
+    { q: 0, r: radius, corner: (20 * Math.PI) / 12 },
+    { q: radius, r: 0, corner: 0 },
+    { q: radius, r: -radius, corner: (4 * Math.PI) / 12 },
+    { q: 0, r: -radius, corner: (8 * Math.PI) / 12 },
+    { q: -radius, r: 0, corner: Math.PI },
+    { q: -radius, r: radius, corner: (16 * Math.PI) / 12 },
+  ];
+
+  return boundaryCells
+    .map(({ q, r, corner }) => {
+      const { x: cx, y: cy } = axialToPixel(q, r, size);
+      const px = cx + size * Math.cos(corner);
+      const py = cy + size * Math.sin(corner);
       return `${px},${py}`;
     })
     .join(" ");
@@ -831,7 +851,7 @@ export default function App() {
         {/* Navigation / Control overlays */}
         <div className="absolute top-4 left-4 z-10 flex gap-2">
           {/* Zoom & Helper Pill */}
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-sm p-1.5 rounded-xl border border-slate-200 shadow-lg shadow-slate-200/50">
+          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-sm p-1.5 rounded-xl border border-slate-200 shadow-lg">
             <button
               onClick={handleZoomIn}
               className="p-1.5 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors"
@@ -874,7 +894,7 @@ export default function App() {
 
         {/* Demo operational help alert popup */}
         {showDemoHelp && (
-          <div className="absolute bottom-4 right-4 z-20 max-w-sm bg-white/95 backdrop-blur-sm p-4 rounded-xl shadow-xl shadow-slate-200/40 border border-slate-200/80 text-xs text-slate-700">
+          <div className="absolute bottom-4 right-4 z-20 max-w-sm bg-white/95 backdrop-blur-sm p-4 rounded-xl border border-slate-200/80 shadow-xl shadow-slate-900/20 text-xs text-slate-700">
             <div className="flex items-center justify-between mb-3">
               <span className="font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
                 <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg border border-indigo-100">
@@ -966,15 +986,13 @@ export default function App() {
           >
             {/* Transform Group carrying Pan & Zoom settings */}
             <g ref={cameraGroupRef} transform={getCameraTransform()}>
-              {/* Outer radius circular boundary backing */}
-              <circle
-                cx="0"
-                cy="0"
-                r={cellSize * 1.62 * radius}
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.04)"
-                strokeWidth="1.5"
-                strokeDasharray="5,15"
+              {/* Map boundary backing */}
+              <polygon
+                points={getMapBoundaryPointsString(radius, cellSize)}
+                fill="#1f2937"
+                stroke="rgba(255, 255, 255, 0.08)"
+                strokeWidth="2"
+                strokeLinejoin="round"
                 style={{ pointerEvents: "none" }}
               />
 
@@ -1001,6 +1019,34 @@ export default function App() {
                 style={{ display: "none", pointerEvents: "none" }}
               />
 
+              <g id="origin-flag" filter="drop-shadow(0px 2px 3px rgba(0,0,0,0.35))" style={{ pointerEvents: "none" }}>
+                <line
+                  x1="0"
+                  y1={cellSize * 0.38}
+                  x2="0"
+                  y2={-cellSize * 0.58}
+                  stroke="#111827"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                />
+                <line
+                  x1="0"
+                  y1={cellSize * 0.38}
+                  x2="0"
+                  y2={-cellSize * 0.58}
+                  stroke="#f8fafc"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d={`M 0 ${-cellSize * 0.58} H ${cellSize * 0.42} L ${cellSize * 0.3} ${-cellSize * 0.38} H 0 Z`}
+                  fill="#f43f5e"
+                  stroke="#111827"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
+              </g>
+              
             </g>
           </svg>
         </div>
