@@ -73,7 +73,7 @@ const styleToCode = new Map<StyleVariant, number>(styleByCode.map((type, code) =
 const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
 const DEFAULT_MAP_RADIUS = 30;
-const NEW_MAP_FILL_RADIUS = 3;
+const NEW_MAP_FILL_RADIUS = 5;
 const MAX_MAP_RADIUS = 40;
 const MAX_TILE_VARIANT = 30;
 
@@ -643,7 +643,7 @@ export default function App() {
     e.preventDefault();
     const zoomFactor = 0.08;
     const newScale = e.deltaY < 0 ? scaleRef.current + zoomFactor : scaleRef.current - zoomFactor;
-    scaleRef.current = Math.max(0.4, Math.min(2.5, newScale));
+    scaleRef.current = Math.max(0.2, Math.min(2.5, newScale));
     updateCameraTransform();
   };
 
@@ -653,7 +653,7 @@ export default function App() {
   };
 
   const handleZoomOut = () => {
-    scaleRef.current = Math.max(0.4, scaleRef.current - 0.15);
+    scaleRef.current = Math.max(0.2, scaleRef.current - 0.15);
     updateCameraTransform();
   };
 
@@ -1000,6 +1000,27 @@ export default function App() {
                 strokeLinejoin="round"
                 style={{ pointerEvents: "none" }}
               />
+              <g
+                id="origin-guide-lines"
+                stroke="#cbd5e1"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                opacity="0.65"
+                style={{ pointerEvents: "none" }}
+              >
+                <line
+                  x1={-radius * cellSize * 2}
+                  y1={radius * cellSize * 2}
+                  x2={radius * cellSize * 2}
+                  y2={-radius * cellSize * 2}
+                />
+                <line
+                  x1={-radius * cellSize * 2}
+                  y1={-radius * cellSize * 2}
+                  x2={radius * cellSize * 2}
+                  y2={radius * cellSize * 2}
+                />
+              </g>
 
               {/* Loop rendering each hex cell within radius boundaries */}
               {renderedCells.map((cell) => {
