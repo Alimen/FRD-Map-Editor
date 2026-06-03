@@ -9,6 +9,7 @@ export enum TerrainType {
   HILL = "hill",
   MOUNTAIN = "mountain",
   LOWLAND = "lowland",
+  LAKE = "lake"
 }
 
 export enum LandmarkType {

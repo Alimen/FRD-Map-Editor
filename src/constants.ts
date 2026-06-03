@@ -18,7 +18,6 @@ export interface LandmarkConfig {
   type: LandmarkType;
   label: string;
   iconName: string;
-  description: string;
 }
 
 export interface StyleConfig {
@@ -71,6 +70,14 @@ export const TERRAIN_CONFIGS: Record<TerrainType, TerrainConfig> = {
     borderColor: "#1f8068",
     accentColor: "#145846",
     bgGradient: "from-[#45c6a2] to-[#218f72]",
+  },
+  [TerrainType.LAKE]: {
+    type: TerrainType.LAKE,
+    label: "湖泊",
+    color: "#7dd3fc",
+    borderColor: "#0284c7",
+    accentColor: "#075985",
+    bgGradient: "from-[#bae6fd] to-[#38bdf8]",
   },
 };
 

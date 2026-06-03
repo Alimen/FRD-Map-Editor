@@ -49,6 +49,7 @@ const terrainByCode = [
   TerrainType.HILL,
   TerrainType.MOUNTAIN,
   TerrainType.LOWLAND,
+  TerrainType.LAKE,
 ];
 
 const landmarkByCode = [
@@ -767,6 +768,7 @@ export default function App() {
       [TerrainType.HILL]: 0,
       [TerrainType.MOUNTAIN]: 0,
       [TerrainType.LOWLAND]: 0,
+      [TerrainType.LAKE]: 0,
     } as Record<TerrainType, number>
   );
   const renderedCells = useMemo(
