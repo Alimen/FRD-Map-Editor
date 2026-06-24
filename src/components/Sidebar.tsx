@@ -25,7 +25,9 @@ import {
   Check,
   Plus,
   PencilLine,
-  Map
+  Map,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 
 interface SidebarProps {
@@ -61,6 +63,7 @@ interface SidebarProps {
   onDuplicateMap: () => void;
   onDeleteMap: () => void;
   onRenameMap: (nextId: string) => void;
+  onMoveMap: (direction: -1 | 1) => void;
 
   // JSON Operations
   exportJSON: () => void;
@@ -133,6 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDuplicateMap,
   onDeleteMap,
   onRenameMap,
+  onMoveMap,
   exportJSON,
   importJSON,
   terrainCounts,
@@ -304,6 +308,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                id="atlas-move-map-up-btn"
+                onClick={() => onMoveMap(-1)}
+                disabled={selectedMapIndex <= 0}
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  selectedMapIndex > 0
+                    ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                    : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
+                }`}
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+                <span>往前</span>
+              </button>
+              <button
+                id="atlas-move-map-down-btn"
+                onClick={() => onMoveMap(1)}
+                disabled={selectedMapIndex >= maps.length - 1}
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
+                  selectedMapIndex < maps.length - 1
+                    ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
+                    : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
+                }`}
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+                <span>往後</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-3 gap-1.5">

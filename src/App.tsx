@@ -466,6 +466,21 @@ export default function App() {
     } : map));
   };
 
+  const handleMoveMap = (direction: -1 | 1) => {
+    const targetIndex = selectedMapIndex + direction;
+    if (targetIndex < 0 || targetIndex >= maps.length) {
+      return;
+    }
+
+    const nextMaps = getMapsWithCurrentSnapshot();
+    const movingMap = nextMaps[selectedMapIndex];
+    nextMaps[selectedMapIndex] = nextMaps[targetIndex];
+    nextMaps[targetIndex] = movingMap;
+
+    setMaps(nextMaps);
+    setSelectedMapIndex(targetIndex);
+  };
+
   // Undo
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
@@ -847,6 +862,7 @@ export default function App() {
         onDuplicateMap={handleDuplicateMap}
         onDeleteMap={handleDeleteMap}
         onRenameMap={handleRenameMap}
+        onMoveMap={handleMoveMap}
         exportJSON={handleExportJSON}
         importJSON={handleImportJSON}
         terrainCounts={terrainCounts}
