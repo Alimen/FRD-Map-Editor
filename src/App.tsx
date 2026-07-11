@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { HexCell, TerrainType, LandmarkType, StyleVariant } from "./types";
+import { HexCell, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "./constants";
@@ -102,6 +102,13 @@ interface AtlasMap {
   id: string;
   radius: number;
   cells: Record<string, HexCell>;
+  travelEvents: TravelEventMap;
+}
+
+interface HistorySnapshot {
+  cells: Record<string, HexCell>;
+  radius: number;
+  travelEvents: TravelEventMap;
 }
 
 const getNextMapId = (maps: AtlasMap[]) => {
@@ -194,20 +201,24 @@ export default function App() {
     return createNewMapCells();
   });
   const cellsRef = useRef<Record<string, HexCell>>(cells);
+  const [travelEvents, setTravelEvents] = useState<TravelEventMap>({});
+  const travelEventsRef = useRef<TravelEventMap>({});
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
+      travelEvents: {},
     },
   ]);
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
 
   // Hot selection editing states
-  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style">("terrain");
+  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "travelEvent">("terrain");
   const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
+  const [selectedTravelEvent, setSelectedTravelEvent] = useState<string>("encounter_1001");
 
   // Coordination displays are updated imperatively to keep hover out of React render.
   const hoveredCellRef = useRef<HexCell | null>(null);
@@ -220,6 +231,7 @@ export default function App() {
   const inspectorLandmarkRef = useRef<HTMLSpanElement | null>(null);
   const inspectorStyleRef = useRef<HTMLSpanElement | null>(null);
   const inspectorVariantRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorTravelEventRef = useRef<HTMLSpanElement | null>(null);
 
   // Dynamic camera refs avoid rerendering the map while panning or zooming.
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -232,12 +244,12 @@ export default function App() {
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Undo/Redo historical record arrays
-  const [history, setHistory] = useState<{ cells: Record<string, HexCell>; radius: number }[]>([]);
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   // High performance painting states
   const isMouseDownRef = useRef<boolean>(false);
-  const strokeChangesRef = useRef<Record<string, HexCell> | null>(null);
+  const strokeChangesRef = useRef<Record<string, true> | null>(null);
   const [showDemoHelp, setShowDemoHelp] = useState<boolean>(true);
 
   const getCameraTransform = useCallback(() => {
@@ -304,6 +316,9 @@ export default function App() {
     if (inspectorVariantRef.current) {
       inspectorVariantRef.current.textContent = String(cell.terrain === TerrainType.NONE ? 0 : cell.v);
     }
+    if (inspectorTravelEventRef.current) {
+      inspectorTravelEventRef.current.textContent = travelEventsRef.current[`${cell.q},${cell.r}`] || "無";
+    }
   }, []);
 
   const updateHoverOverlay = useCallback((cell: HexCell | null) => {
@@ -345,31 +360,41 @@ export default function App() {
       ...map,
       radius,
       cells: JSON.parse(JSON.stringify(cells)),
+      travelEvents: JSON.parse(JSON.stringify(travelEvents)),
     } : map);
-  }, [maps, selectedMapIndex, cells, radius]);
+  }, [maps, selectedMapIndex, cells, radius, travelEvents]);
 
-  const updateCurrentMapSnapshot = useCallback((nextCells: Record<string, HexCell>, nextRadius: number) => {
+  const updateCurrentMapSnapshot = useCallback((nextCells: Record<string, HexCell>, nextRadius: number, nextTravelEvents: TravelEventMap = travelEventsRef.current) => {
     setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
       ...map,
       radius: nextRadius,
       cells: JSON.parse(JSON.stringify(nextCells)),
+      travelEvents: JSON.parse(JSON.stringify(nextTravelEvents)),
     } : map));
   }, [selectedMapIndex]);
 
-  const resetHistory = useCallback((nextCells: Record<string, HexCell>, nextRadius: number) => {
-    setHistory([{ cells: JSON.parse(JSON.stringify(nextCells)), radius: nextRadius }]);
+  const resetHistory = useCallback((nextCells: Record<string, HexCell>, nextRadius: number, nextTravelEvents: TravelEventMap) => {
+    setHistory([{
+      cells: JSON.parse(JSON.stringify(nextCells)),
+      radius: nextRadius,
+      travelEvents: JSON.parse(JSON.stringify(nextTravelEvents)),
+    }]);
     setHistoryIndex(0);
   }, []);
 
   // Initialize History with current state
   useEffect(() => {
-    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS };
+    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS, travelEvents: {} };
     setHistory([initialState]);
     setHistoryIndex(0);
   }, []);
 
-  const pushToHistory = (newCells: Record<string, HexCell>, newRadius: number) => {
-    const freshState = { cells: JSON.parse(JSON.stringify(newCells)), radius: newRadius };
+  const pushToHistory = (newCells: Record<string, HexCell>, newRadius: number, newTravelEvents: TravelEventMap) => {
+    const freshState = {
+      cells: JSON.parse(JSON.stringify(newCells)),
+      radius: newRadius,
+      travelEvents: JSON.parse(JSON.stringify(newTravelEvents)),
+    };
     // Slice off any REDO redoable states
     const sliceHistory = history.slice(0, historyIndex + 1);
     const updatedHistory = [...sliceHistory, freshState];
@@ -395,9 +420,11 @@ export default function App() {
     setMaps(nextMaps);
     setSelectedMapIndex(mapIndex);
     cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
+    travelEventsRef.current = JSON.parse(JSON.stringify(targetMap.travelEvents));
     setCells(cellsRef.current);
+    setTravelEvents(travelEventsRef.current);
     setRadius(targetMap.radius);
-    resetHistory(targetMap.cells, targetMap.radius);
+    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -408,14 +435,17 @@ export default function App() {
       id: getNextMapId(nextMaps),
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
+      travelEvents: {},
     };
 
     setMaps([...nextMaps, nextMap]);
     setSelectedMapIndex(nextMaps.length);
     cellsRef.current = JSON.parse(JSON.stringify(nextMap.cells));
+    travelEventsRef.current = JSON.parse(JSON.stringify(nextMap.travelEvents));
     setCells(cellsRef.current);
+    setTravelEvents(travelEventsRef.current);
     setRadius(nextMap.radius);
-    resetHistory(nextMap.cells, nextMap.radius);
+    resetHistory(nextMap.cells, nextMap.radius, nextMap.travelEvents);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -427,14 +457,17 @@ export default function App() {
       id: getNextMapId(nextMaps),
       radius: sourceMap.radius,
       cells: JSON.parse(JSON.stringify(sourceMap.cells)),
+      travelEvents: JSON.parse(JSON.stringify(sourceMap.travelEvents)),
     };
 
     setMaps([...nextMaps, duplicatedMap]);
     setSelectedMapIndex(nextMaps.length);
     cellsRef.current = JSON.parse(JSON.stringify(duplicatedMap.cells));
+    travelEventsRef.current = JSON.parse(JSON.stringify(duplicatedMap.travelEvents));
     setCells(cellsRef.current);
+    setTravelEvents(travelEventsRef.current);
     setRadius(duplicatedMap.radius);
-    resetHistory(duplicatedMap.cells, duplicatedMap.radius);
+    resetHistory(duplicatedMap.cells, duplicatedMap.radius, duplicatedMap.travelEvents);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -451,9 +484,11 @@ export default function App() {
     setMaps(nextMaps);
     setSelectedMapIndex(nextSelectedIndex);
     cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
+    travelEventsRef.current = JSON.parse(JSON.stringify(targetMap.travelEvents));
     setCells(cellsRef.current);
+    setTravelEvents(travelEventsRef.current);
     setRadius(targetMap.radius);
-    resetHistory(targetMap.cells, targetMap.radius);
+    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -487,9 +522,11 @@ export default function App() {
       const prevIndex = historyIndex - 1;
       const targetState = history[prevIndex];
       cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
+      travelEventsRef.current = JSON.parse(JSON.stringify(targetState.travelEvents));
       setCells(cellsRef.current);
+      setTravelEvents(travelEventsRef.current);
       setRadius(targetState.radius);
-      updateCurrentMapSnapshot(targetState.cells, targetState.radius);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents);
       setHistoryIndex(prevIndex);
       setHoveredCellImperatively(null);
     }
@@ -501,9 +538,11 @@ export default function App() {
       const nextIndex = historyIndex + 1;
       const targetState = history[nextIndex];
       cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
+      travelEventsRef.current = JSON.parse(JSON.stringify(targetState.travelEvents));
       setCells(cellsRef.current);
+      setTravelEvents(travelEventsRef.current);
       setRadius(targetState.radius);
-      updateCurrentMapSnapshot(targetState.cells, targetState.radius);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents);
       setHistoryIndex(nextIndex);
       setHoveredCellImperatively(null);
     }
@@ -532,11 +571,16 @@ export default function App() {
         }
       }
     }
-    pushToHistory(newCells, newRadius);
+    const nextTravelEvents = Object.fromEntries(
+      Object.entries(travelEventsRef.current).filter(([key]) => Boolean(newCells[key]))
+    ) as TravelEventMap;
+    pushToHistory(newCells, newRadius, nextTravelEvents);
     cellsRef.current = newCells;
+    travelEventsRef.current = nextTravelEvents;
     setCells(newCells);
+    setTravelEvents(nextTravelEvents);
     setRadius(newRadius);
-    updateCurrentMapSnapshot(newCells, newRadius);
+    updateCurrentMapSnapshot(newCells, newRadius, nextTravelEvents);
     setHoveredCellImperatively(null);
     
     // Auto center map camera
@@ -550,12 +594,17 @@ export default function App() {
     if (!previous) return;
 
     let updatedCell = { ...previous };
+    let nextTravelEvents = travelEventsRef.current;
 
     if (activeLayer === "terrain") {
       updatedCell.terrain = selectedTerrain;
       if (selectedTerrain === TerrainType.NONE) {
         updatedCell.landmark = LandmarkType.NONE;
         updatedCell.style = StyleVariant.NORMAL;
+        if (travelEventsRef.current[key]) {
+          nextTravelEvents = { ...travelEventsRef.current };
+          delete nextTravelEvents[key];
+        }
       }
     } else if (activeLayer === "landmark") {
       if (previous.terrain === TerrainType.NONE) {
@@ -567,6 +616,25 @@ export default function App() {
         return;
       }
       updatedCell.style = selectedStyle;
+    } else if (activeLayer === "travelEvent") {
+      if (previous.terrain === TerrainType.NONE) {
+        return;
+      }
+      const eventId = selectedTravelEvent.trim();
+      const previousEventId = travelEventsRef.current[key] || "";
+
+      if (!eventId) {
+        if (!previousEventId) {
+          return;
+        }
+        nextTravelEvents = { ...travelEventsRef.current };
+        delete nextTravelEvents[key];
+      } else {
+        if (previousEventId === eventId) {
+          return;
+        }
+        nextTravelEvents = { ...travelEventsRef.current, [key]: eventId };
+      }
     }
 
     if (updatedCell.terrain !== previous.terrain) {
@@ -577,21 +645,25 @@ export default function App() {
     if (
       updatedCell.terrain === previous.terrain &&
       updatedCell.landmark === previous.landmark &&
-      updatedCell.style === previous.style
+      updatedCell.style === previous.style &&
+      nextTravelEvents === travelEventsRef.current
     ) {
       return;
     }
 
     const nextCells = { ...cellsRef.current, [key]: updatedCell };
     cellsRef.current = nextCells;
+    travelEventsRef.current = nextTravelEvents;
     setCells(nextCells);
-    updateCurrentMapSnapshot(nextCells, radius);
+    setTravelEvents(nextTravelEvents);
+    updateCurrentMapSnapshot(nextCells, radius, nextTravelEvents);
+    setHoveredCellImperatively(updatedCell);
 
     // Accumulate alterations within the active paint stroke
     if (strokeChangesRef.current) {
-      strokeChangesRef.current[key] = updatedCell;
+      strokeChangesRef.current[key] = true;
     }
-  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, updateCurrentMapSnapshot]);
+  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, selectedTravelEvent, updateCurrentMapSnapshot, setHoveredCellImperatively]);
 
   // Canvas Drag/Pan
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
@@ -643,7 +715,7 @@ export default function App() {
 
       // Stroke holds paint changes? Commit as a individual historic state
       if (strokeChangesRef.current && Object.keys(strokeChangesRef.current).length > 0) {
-        pushToHistory(cellsRef.current, radius);
+        pushToHistory(cellsRef.current, radius, travelEventsRef.current);
       }
       strokeChangesRef.current = null;
     };
@@ -684,6 +756,7 @@ export default function App() {
 
   const serializeMap = (map: AtlasMap) => {
     const exportCells = (Object.values(map.cells) as HexCell[]).filter((c) => c.terrain !== TerrainType.NONE);
+    const exportCellKeys = new Set(exportCells.map((c) => `${c.q},${c.r}`));
     return {
       id: map.id,
       world: {
@@ -701,6 +774,9 @@ export default function App() {
         campCoords: exportCells
           .filter((c) => campLandmarks.has(c.landmark))
           .map((c) => `${c.q},${c.r}`),
+        travelEvent: Object.entries(map.travelEvents)
+          .filter(([coord, eventId]) => exportCellKeys.has(coord) && eventId.trim())
+          .map(([coord, eventId]) => ({ c: coord, v: eventId })),
       },
     };
   };
@@ -753,6 +829,20 @@ export default function App() {
       return null;
     }
 
+    const importedTravelEvents = data.world?.travelEvent ?? data.travelEvent ?? data.travelEvents ?? [];
+    const nextTravelEvents: TravelEventMap = {};
+
+    if (Array.isArray(importedTravelEvents)) {
+      importedTravelEvents.forEach((event: any) => {
+        if (typeof event?.c === "string" && typeof event?.v === "string" && incomingCells[event.c]) {
+          const eventId = event.v.trim();
+          if (eventId) {
+            nextTravelEvents[event.c] = eventId;
+          }
+        }
+      });
+    }
+
     const nextRadius = typeof data.world?.radius === "number"
       ? data.world.radius
       : typeof data.radius === "number"
@@ -763,6 +853,7 @@ export default function App() {
       id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallbackId,
       radius: nextRadius,
       cells: { ...createNoTerrainCells(nextRadius), ...incomingCells },
+      travelEvents: nextTravelEvents,
     };
   };
 
@@ -824,8 +915,10 @@ export default function App() {
       setSelectedMapIndex(0);
       setRadius(firstMap.radius);
       cellsRef.current = JSON.parse(JSON.stringify(firstMap.cells));
+      travelEventsRef.current = JSON.parse(JSON.stringify(firstMap.travelEvents));
       setCells(cellsRef.current);
-      resetHistory(firstMap.cells, firstMap.radius);
+      setTravelEvents(travelEventsRef.current);
+      resetHistory(firstMap.cells, firstMap.radius, firstMap.travelEvents);
       setHoveredCellImperatively(null);
 
       // Reset camera view
@@ -848,6 +941,8 @@ export default function App() {
         setSelectedLandmark={setSelectedLandmark}
         selectedStyle={selectedStyle}
         setSelectedStyle={setSelectedStyle}
+        selectedTravelEvent={selectedTravelEvent}
+        setSelectedTravelEvent={setSelectedTravelEvent}
         radius={radius}
         maxGridRadius={MAX_MAP_RADIUS}
         onResizeGrid={handleResizeGrid}
@@ -977,6 +1072,11 @@ export default function App() {
                 <span className="ml-auto text-slate-400 text-[10px]">v:</span>
                 <span ref={inspectorVariantRef} className="font-mono font-semibold text-slate-700" />
               </div>
+
+              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
+                <span className="text-slate-400 text-[10px]">旅行事件:</span>
+                <span ref={inspectorTravelEventRef} className="font-mono font-semibold text-amber-700 truncate" />
+              </div>
             </div>
           <div ref={inspectorEmptyRef} className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
             將滑鼠移至地圖上即可看見座標資訊
@@ -1050,6 +1150,7 @@ export default function App() {
                     cell={cell}
                     size={cellSize}
                     isSelected={false}
+                    travelEvent={travelEvents[key]}
                   />
                 );
               })}

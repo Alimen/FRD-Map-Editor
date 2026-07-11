@@ -12,12 +12,14 @@ interface HexRendererProps {
   cell: HexCell;
   size: number;
   isSelected?: boolean;
+  travelEvent?: string;
 }
 
 const HexRendererComponent: React.FC<HexRendererProps> = ({
   cell,
   size,
   isSelected,
+  travelEvent,
 }) => {
   const { q, r, terrain, landmark, style } = cell;
 
@@ -149,6 +151,8 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   const hasStyleMarker = style !== StyleVariant.NORMAL;
   const styleRingRadius = size * 0.78;
   const styleRingDash = `${Math.max(3, size * 0.09)} ${Math.max(2, size * 0.06)}`;
+  const eventMarkerX = cx + size * 0.42;
+  const eventMarkerY = cy - size * 0.46;
 
   return (
     <g
@@ -184,6 +188,30 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
 
       {/* Main interactive/gorgeous landmark (castle, tower, camp) */}
       {hasTerrain && renderLandmarks()}
+
+      {hasTerrain && travelEvent && (
+        <g className="pointer-events-none" filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.32))">
+          <circle
+            cx={eventMarkerX}
+            cy={eventMarkerY}
+            r={Math.max(7, size * 0.19)}
+            fill="#f59e0b"
+            stroke="#78350f"
+            strokeWidth={Math.max(1, size * 0.035)}
+          />
+          <text
+            x={eventMarkerX}
+            y={eventMarkerY + Math.max(3, size * 0.075)}
+            textAnchor="middle"
+            fontSize={Math.max(7, size * 0.18)}
+            fontWeight="800"
+            fill="#451a03"
+            fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+          >
+            EV
+          </text>
+        </g>
+      )}
 
       {/* Standard subtle coordinate labels in light text if user zooms in or debugs */}
       {hasTerrain && size >= 28 && (

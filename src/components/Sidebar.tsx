@@ -27,13 +27,14 @@ import {
   PencilLine,
   Map,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ScrollText
 } from "lucide-react";
 
 interface SidebarProps {
   // Painting Brush State
-  activeLayer: "terrain" | "landmark" | "style";
-  setActiveLayer: (layer: "terrain" | "landmark" | "style") => void;
+  activeLayer: "terrain" | "landmark" | "style" | "travelEvent";
+  setActiveLayer: (layer: "terrain" | "landmark" | "style" | "travelEvent") => void;
 
   selectedTerrain: TerrainType;
   setSelectedTerrain: (t: TerrainType) => void;
@@ -43,6 +44,9 @@ interface SidebarProps {
 
   selectedStyle: StyleVariant;
   setSelectedStyle: (s: StyleVariant) => void;
+
+  selectedTravelEvent: string;
+  setSelectedTravelEvent: (eventId: string) => void;
 
   // Grid Controls
   radius: number;
@@ -122,6 +126,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setSelectedLandmark,
   selectedStyle,
   setSelectedStyle,
+  selectedTravelEvent,
+  setSelectedTravelEvent,
   radius,
   maxGridRadius,
   onResizeGrid,
@@ -417,7 +423,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onToggle={() => toggleGroup("brush")}
         >
           <div className="space-y-3">
-            <div className="grid grid-cols-3 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+            <div className="grid grid-cols-4 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
               <button
                 id="layer-btn-terrain"
                 onClick={() => setActiveLayer("terrain")}
@@ -453,6 +459,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <Sparkles className="w-4 h-4" />
                 <span>風格</span>
+              </button>
+              <button
+                id="layer-btn-travel-event"
+                onClick={() => setActiveLayer("travelEvent")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "travelEvent"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <ScrollText className="w-4 h-4" />
+                <span>事件</span>
               </button>
             </div>
           </div>
@@ -540,6 +558,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {activeLayer === "travelEvent" && (
+            <div id="travel-event-selector" className="space-y-3">
+              <span className="text-xs font-bold text-slate-500 block mb-2">指定旅行事件</span>
+              <div className="relative">
+                <ScrollText className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="travel-event-input"
+                  type="text"
+                  value={selectedTravelEvent}
+                  onChange={(e) => setSelectedTravelEvent(e.target.value)}
+                  placeholder="encounter_1001"
+                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <button
+                id="travel-event-clear-btn"
+                onClick={() => setSelectedTravelEvent("")}
+                className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
+                  selectedTravelEvent.trim() === ""
+                    ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                    : "bg-white/80 border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300" />
+                  <span className="text-xs font-medium text-slate-700">
+                    清除事件
+                  </span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              </button>
             </div>
           )}
 

@@ -37,12 +37,16 @@ export interface HexCell {
   v: number;
 }
 
+export type TravelEventMap = Record<string, string>;
+
 export interface MapData {
   radius: number;
   cells: Record<string, HexCell>; // Key is "q,r"
+  travelEvents?: TravelEventMap; // Key is "q,r", value is event id
 }
 
 export interface HistoryState {
   cells: Record<string, HexCell>;
   radius: number;
+  travelEvents: TravelEventMap;
 }
