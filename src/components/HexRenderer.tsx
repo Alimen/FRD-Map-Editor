@@ -7,6 +7,7 @@ import React from "react";
 import { HexCell, TerrainType, LandmarkType, StyleVariant } from "../types";
 import { TERRAIN_CONFIGS, STYLE_CONFIGS } from "../constants";
 import { axialToPixel } from "../hexLayout";
+import { getTravelEventColor } from "../travelEventColors";
 
 interface HexRendererProps {
   cell: HexCell;
@@ -153,6 +154,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   const styleRingDash = `${Math.max(3, size * 0.09)} ${Math.max(2, size * 0.06)}`;
   const eventMarkerX = cx + size * 0.42;
   const eventMarkerY = cy - size * 0.46;
+  const eventColor = travelEvent ? getTravelEventColor(travelEvent) : null;
 
   return (
     <g
@@ -189,14 +191,14 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
       {/* Main interactive/gorgeous landmark (castle, tower, camp) */}
       {hasTerrain && renderLandmarks()}
 
-      {hasTerrain && travelEvent && (
+      {hasTerrain && travelEvent && eventColor && (
         <g className="pointer-events-none" filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.32))">
           <circle
             cx={eventMarkerX}
             cy={eventMarkerY}
             r={Math.max(7, size * 0.19)}
-            fill="#f59e0b"
-            stroke="#78350f"
+            fill={eventColor.fill}
+            stroke={eventColor.stroke}
             strokeWidth={Math.max(1, size * 0.035)}
           />
           <text
@@ -205,7 +207,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
             textAnchor="middle"
             fontSize={Math.max(7, size * 0.18)}
             fontWeight="800"
-            fill="#451a03"
+            fill={eventColor.text}
             fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
           >
             EV

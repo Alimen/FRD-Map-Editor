@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { TerrainType, LandmarkType, StyleVariant } from "../types";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "../constants";
+import { getTravelEventColor } from "../travelEventColors";
 import {
   Undo2,
   Redo2,
@@ -153,6 +154,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [inputRadiusInput, setInputRadiusInput] = useState<string>(String(radius));
   const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
+  const [newTravelEventInput, setNewTravelEventInput] = useState<string>("");
+  const [travelEventBrushes, setTravelEventBrushes] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<SidebarGroupId, boolean>>({
     mapAtlas: true,
@@ -248,6 +251,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const handleAddTravelEventBrush = (e: React.FormEvent) => {
+    e.preventDefault();
+    const eventId = newTravelEventInput.trim();
+    if (!eventId) {
+      return;
+    }
+
+    setTravelEventBrushes((prev) => prev.includes(eventId) ? prev : [...prev, eventId]);
+    setSelectedTravelEvent(eventId);
+    setNewTravelEventInput("");
   };
 
   return (
@@ -564,34 +579,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {activeLayer === "travelEvent" && (
             <div id="travel-event-selector" className="space-y-3">
               <span className="text-xs font-bold text-slate-500 block mb-2">指定旅行事件</span>
-              <div className="relative">
-                <ScrollText className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  id="travel-event-input"
-                  type="text"
-                  value={selectedTravelEvent}
-                  onChange={(e) => setSelectedTravelEvent(e.target.value)}
-                  placeholder="encounter_1001"
-                  className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                />
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                <button
+                  id="travel-event-none-btn"
+                  onClick={() => setSelectedTravelEvent("")}
+                  className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
+                    selectedTravelEvent.trim() === ""
+                      ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                      : "bg-white/80 border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" />
+                    <span className="text-xs font-medium text-slate-700">
+                      無事件
+                    </span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </button>
+
+                {travelEventBrushes.map((eventId) => {
+                  const eventColor = getTravelEventColor(eventId);
+
+                  return (
+                    <button
+                      key={eventId}
+                      onClick={() => setSelectedTravelEvent(eventId)}
+                      className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
+                        selectedTravelEvent === eventId
+                          ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                          : "bg-white/80 border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div
+                          className="w-3.5 h-3.5 rounded-full border shrink-0"
+                          style={{
+                            backgroundColor: eventColor.fill,
+                            borderColor: eventColor.stroke,
+                          }}
+                        />
+                        <span className="text-xs font-medium text-slate-700 font-mono truncate">
+                          {eventId}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                id="travel-event-clear-btn"
-                onClick={() => setSelectedTravelEvent("")}
-                className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
-                  selectedTravelEvent.trim() === ""
-                    ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
-                    : "bg-white/80 border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300" />
-                  <span className="text-xs font-medium text-slate-700">
-                    清除事件
-                  </span>
+
+              <form onSubmit={handleAddTravelEventBrush} className="flex gap-2 items-center">
+                <div className="relative flex-1 min-w-0">
+                  <ScrollText className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="travel-event-input"
+                    type="text"
+                    value={newTravelEventInput}
+                    onChange={(e) => setNewTravelEventInput(e.target.value)}
+                    placeholder="encounter_1001"
+                    className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
                 </div>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              </button>
+                <button
+                  id="travel-event-add-btn"
+                  type="submit"
+                  className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"
+                  title="新增旅行事件筆刷"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </form>
             </div>
           )}
 

@@ -218,7 +218,7 @@ export default function App() {
   const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
-  const [selectedTravelEvent, setSelectedTravelEvent] = useState<string>("encounter_1001");
+  const [selectedTravelEvent, setSelectedTravelEvent] = useState<string>("");
 
   // Coordination displays are updated imperatively to keep hover out of React render.
   const hoveredCellRef = useRef<HexCell | null>(null);
