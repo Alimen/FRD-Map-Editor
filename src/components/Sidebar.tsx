@@ -48,6 +48,10 @@ interface SidebarProps {
 
   selectedTravelEvent: string;
   setSelectedTravelEvent: (eventId: string) => void;
+  loadedTravelEventBrushes: {
+    eventIds: string[];
+    version: number;
+  };
 
   // Grid Controls
   radius: number;
@@ -129,6 +133,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setSelectedStyle,
   selectedTravelEvent,
   setSelectedTravelEvent,
+  loadedTravelEventBrushes,
   radius,
   maxGridRadius,
   onResizeGrid,
@@ -180,6 +185,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     setMapNameInput(maps[selectedMapIndex]?.id ?? "");
   }, [maps, selectedMapIndex]);
+
+  useEffect(() => {
+    setTravelEventBrushes(loadedTravelEventBrushes.eventIds);
+    setSelectedTravelEvent("");
+    setNewTravelEventInput("");
+  }, [loadedTravelEventBrushes, setSelectedTravelEvent]);
 
   // Handle direct file uploads
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

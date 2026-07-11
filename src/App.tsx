@@ -219,6 +219,10 @@ export default function App() {
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
   const [selectedTravelEvent, setSelectedTravelEvent] = useState<string>("");
+  const [loadedTravelEventBrushes, setLoadedTravelEventBrushes] = useState<{ eventIds: string[]; version: number }>({
+    eventIds: [],
+    version: 0,
+  });
 
   // Coordination displays are updated imperatively to keep hover out of React render.
   const hoveredCellRef = useRef<HexCell | null>(null);
@@ -910,6 +914,9 @@ export default function App() {
       }
 
       const firstMap = importedMaps[0];
+      const importedTravelEventIds = Array.from(new Set(
+        importedMaps.flatMap((map) => Object.values(map.travelEvents))
+      )).sort((a, b) => a.localeCompare(b));
 
       setMaps(importedMaps);
       setSelectedMapIndex(0);
@@ -919,6 +926,10 @@ export default function App() {
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
       resetHistory(firstMap.cells, firstMap.radius, firstMap.travelEvents);
+      setLoadedTravelEventBrushes((prev) => ({
+        eventIds: importedTravelEventIds,
+        version: prev.version + 1,
+      }));
       setHoveredCellImperatively(null);
 
       // Reset camera view
@@ -943,6 +954,7 @@ export default function App() {
         setSelectedStyle={setSelectedStyle}
         selectedTravelEvent={selectedTravelEvent}
         setSelectedTravelEvent={setSelectedTravelEvent}
+        loadedTravelEventBrushes={loadedTravelEventBrushes}
         radius={radius}
         maxGridRadius={MAX_MAP_RADIUS}
         onResizeGrid={handleResizeGrid}
