@@ -230,7 +230,6 @@ export default function App() {
   const inspectorContentRef = useRef<HTMLDivElement | null>(null);
   const inspectorEmptyRef = useRef<HTMLDivElement | null>(null);
   const inspectorAxialRef = useRef<HTMLSpanElement | null>(null);
-  const inspectorCubeRef = useRef<HTMLSpanElement | null>(null);
   const inspectorTerrainRef = useRef<HTMLSpanElement | null>(null);
   const inspectorLandmarkRef = useRef<HTMLSpanElement | null>(null);
   const inspectorStyleRef = useRef<HTMLSpanElement | null>(null);
@@ -304,9 +303,6 @@ export default function App() {
     if (inspectorAxialRef.current) {
       inspectorAxialRef.current.textContent = `Axial: (${cell.q}, ${cell.r})`;
     }
-    if (inspectorCubeRef.current) {
-      inspectorCubeRef.current.textContent = `Cube: (${cell.q}, ${cell.r}, ${-cell.q - cell.r})`;
-    }
     if (inspectorTerrainRef.current) {
       inspectorTerrainRef.current.textContent = TERRAIN_CONFIGS[cell.terrain]?.label || cell.terrain;
     }
@@ -315,7 +311,9 @@ export default function App() {
     }
     if (inspectorStyleRef.current) {
       inspectorStyleRef.current.textContent = STYLE_CONFIGS[cell.style]?.label || cell.style;
-      inspectorStyleRef.current.style.color = STYLE_CONFIGS[cell.style]?.borderColor || "";
+      inspectorStyleRef.current.style.color = cell.style === StyleVariant.NORMAL
+        ? ""
+        : STYLE_CONFIGS[cell.style]?.borderColor || "";
     }
     if (inspectorVariantRef.current) {
       inspectorVariantRef.current.textContent = String(cell.terrain === TerrainType.NONE ? 0 : cell.v);
@@ -778,7 +776,7 @@ export default function App() {
         campCoords: exportCells
           .filter((c) => campLandmarks.has(c.landmark))
           .map((c) => `${c.q},${c.r}`),
-        travelEvent: Object.entries(map.travelEvents)
+        travelEvents: Object.entries(map.travelEvents)
           .filter(([coord, eventId]) => exportCellKeys.has(coord) && eventId.trim())
           .map(([coord, eventId]) => ({ c: coord, v: eventId })),
       },
@@ -833,7 +831,7 @@ export default function App() {
       return null;
     }
 
-    const importedTravelEvents = data.world?.travelEvent ?? data.travelEvent ?? data.travelEvents ?? [];
+    const importedTravelEvents = data.world?.travelEvents ?? data.travelEvents ?? [];
     const nextTravelEvents: TravelEventMap = {};
 
     if (Array.isArray(importedTravelEvents)) {
@@ -1064,7 +1062,6 @@ export default function App() {
           <div ref={inspectorContentRef} className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm flex flex-col space-y-1.5" style={{ display: "none" }}>
               <div className="flex items-center justify-between gap-3">
                 <span ref={inspectorAxialRef} className="text-xs font-bold text-indigo-600 font-mono" />
-                <span ref={inspectorCubeRef} className="text-[10px] font-mono text-slate-400" />
               </div>
 
               <div className="grid grid-cols-2 gap-1.5 text-xs">
@@ -1078,16 +1075,20 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
-                <span className="text-slate-400 text-[10px]">風格:</span>
-                <span ref={inspectorStyleRef} className="font-semibold text-slate-700" />
-                <span className="ml-auto text-slate-400 text-[10px]">v:</span>
-                <span ref={inspectorVariantRef} className="font-mono font-semibold text-slate-700" />
+              <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px]">風格:</span>
+                  <span ref={inspectorStyleRef} className="font-semibold text-slate-700" />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px]">v:</span>
+                  <span ref={inspectorVariantRef} className="font-mono font-semibold text-slate-700" />
+                </div>
               </div>
 
               <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
-                <span className="text-slate-400 text-[10px]">旅行事件:</span>
-                <span ref={inspectorTravelEventRef} className="font-mono font-semibold text-amber-700 truncate" />
+                <span className="text-slate-400 text-[10px]">事件:</span>
+                <span ref={inspectorTravelEventRef} className="font-mono font-semibold text-slate-700 truncate" />
               </div>
             </div>
           <div ref={inspectorEmptyRef} className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
