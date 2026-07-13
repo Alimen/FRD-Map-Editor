@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
   Plus,
+  Minus,
   PencilLine,
   Map,
   ArrowUp,
@@ -82,6 +83,10 @@ interface SidebarProps {
 }
 
 type SidebarGroupId = "mapAtlas" | "brush" | "history" | "stats" | "grid" | "json";
+
+const sortTravelEventBrushes = (eventIds: string[]) => {
+  return [...eventIds].sort((a, b) => a.localeCompare(b));
+};
 
 interface CollapsibleGroupProps {
   title: string;
@@ -187,7 +192,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [maps, selectedMapIndex]);
 
   useEffect(() => {
-    setTravelEventBrushes(loadedTravelEventBrushes.eventIds);
+    setTravelEventBrushes(sortTravelEventBrushes(loadedTravelEventBrushes.eventIds));
     setSelectedTravelEvent("");
     setNewTravelEventInput("");
   }, [loadedTravelEventBrushes, setSelectedTravelEvent]);
@@ -271,9 +276,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    setTravelEventBrushes((prev) => prev.includes(eventId) ? prev : [...prev, eventId]);
+    setTravelEventBrushes((prev) => {
+      return prev.includes(eventId) ? prev : sortTravelEventBrushes([...prev, eventId]);
+    });
     setSelectedTravelEvent(eventId);
     setNewTravelEventInput("");
+  };
+
+  const handleRemoveTravelEventBrush = (eventId: string) => {
+    setTravelEventBrushes((prev) => prev.filter((brushEventId) => brushEventId !== eventId));
+    if (selectedTravelEvent === eventId) {
+      setSelectedTravelEvent("");
+    }
   };
 
   return (
@@ -613,29 +627,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   const eventColor = getTravelEventColor(eventId);
 
                   return (
-                    <button
+                    <div
                       key={eventId}
-                      onClick={() => setSelectedTravelEvent(eventId)}
-                      className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
+                      className={`w-full rounded-lg border transition-all flex items-stretch overflow-hidden ${
                         selectedTravelEvent === eventId
                           ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
                           : "bg-white/80 border-slate-200 hover:border-slate-300"
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div
-                          className="w-3.5 h-3.5 rounded-full border shrink-0"
-                          style={{
-                            backgroundColor: eventColor.fill,
-                            borderColor: eventColor.stroke,
-                          }}
-                        />
-                        <span className="text-xs font-medium text-slate-700 font-mono truncate">
-                          {eventId}
-                        </span>
-                      </div>
-                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    </button>
+                      <button
+                        onClick={() => setSelectedTravelEvent(eventId)}
+                        className="flex-1 min-w-0 p-2 px-3 text-left flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className="w-3.5 h-3.5 rounded-full border shrink-0"
+                            style={{
+                              backgroundColor: eventColor.fill,
+                              borderColor: eventColor.stroke,
+                            }}
+                          />
+                          <span className="text-xs font-medium text-slate-700 font-mono truncate">
+                            {eventId}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </button>
+                      <button
+                        onClick={() => handleRemoveTravelEventBrush(eventId)}
+                        className="w-9 shrink-0 border-l border-slate-200/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
+                        title="移除事件筆刷"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                    </div>
                   );
                 })}
               </div>
