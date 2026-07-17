@@ -163,7 +163,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   const eventMarkerY = cy - size * 0.46;
   const eventColor = travelEvent ? getTravelEventColor(travelEvent) : null;
   const campTagLabel = campTag?.trim() ?? "";
-  const visibleCampTag = campTagLabel && campTagLabel !== "na" ? campTagLabel : "";
+  const visibleCampTag = campTagLabel;
   const campTagColor = visibleCampTag ? getTravelEventColor(visibleCampTag) : null;
   const campTagMarkerX = cx - size * 0.42;
   const campTagMarkerY = cy - size * 0.46;

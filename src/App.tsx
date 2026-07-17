@@ -92,7 +92,7 @@ const campLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_CAMP,
   LandmarkType.SUB_CAMP,
 ]);
-const DEFAULT_CAMP_TAG = "na";
+const DEFAULT_CAMP_TAG = "";
 
 interface AtlasMap {
   id: string;
@@ -656,7 +656,7 @@ export default function App() {
           nextTravelEvents = { ...travelEventsRef.current };
           delete nextTravelEvents[key];
         }
-        if (campTagsRef.current[key]) {
+        if (key in campTagsRef.current) {
           nextCampTags = { ...campTagsRef.current };
           delete nextCampTags[key];
         }
@@ -667,10 +667,10 @@ export default function App() {
       }
       updatedCell.landmark = selectedLandmark;
       if (campLandmarks.has(selectedLandmark)) {
-        if (!campTagsRef.current[key]) {
+        if (!(key in campTagsRef.current)) {
           nextCampTags = { ...campTagsRef.current, [key]: DEFAULT_CAMP_TAG };
         }
-      } else if (campTagsRef.current[key]) {
+      } else if (key in campTagsRef.current) {
         nextCampTags = { ...campTagsRef.current };
         delete nextCampTags[key];
       }
@@ -703,10 +703,7 @@ export default function App() {
         return;
       }
       const tag = selectedCampTag.trim();
-      if (!tag) {
-        return;
-      }
-      const previousTag = campTagsRef.current[key] || "";
+      const previousTag = campTagsRef.current[key] ?? DEFAULT_CAMP_TAG;
 
       if (previousTag === tag) {
         return;
@@ -934,16 +931,13 @@ export default function App() {
           incomingCells[campTag.c] &&
           campLandmarks.has(incomingCells[campTag.c].landmark)
         ) {
-          const tag = campTag.t.trim();
-          if (tag) {
-            nextCampTags[campTag.c] = tag;
-          }
+          nextCampTags[campTag.c] = campTag.t.trim();
         }
       });
     }
 
     Object.entries(incomingCells).forEach(([coord, cell]) => {
-      if (campLandmarks.has(cell.landmark) && !nextCampTags[coord]) {
+      if (campLandmarks.has(cell.landmark) && !(coord in nextCampTags)) {
         nextCampTags[coord] = DEFAULT_CAMP_TAG;
       }
     });

@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 
 type BrushLayer = "terrain" | "landmark" | "style" | "travelEvent" | "campTag";
-const DEFAULT_CAMP_TAG = "na";
+const DEFAULT_CAMP_TAG = "";
 
 interface SidebarProps {
   // Painting Brush State
@@ -786,7 +786,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             }}
                           />
                           <span className="text-xs font-medium text-slate-700 font-mono truncate">
-                            {tag === DEFAULT_CAMP_TAG ? "清除標籤 (na)" : tag}
+                            {tag === DEFAULT_CAMP_TAG ? "清除標籤" : tag}
                           </span>
                         </div>
                         <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
