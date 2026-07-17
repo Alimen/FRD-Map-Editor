@@ -88,11 +88,6 @@ const normalizeTileVariant = (value: unknown) => {
   return Math.max(0, Math.min(MAX_TILE_VARIANT, Math.round(value)));
 };
 
-const dungeonLandmarks = new Set<LandmarkType>([
-  LandmarkType.MAIN_DUNGEON,
-  LandmarkType.SUB_DUNGEON,
-]);
-
 const campLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_CAMP,
   LandmarkType.SUB_CAMP,
@@ -770,9 +765,6 @@ export default function App() {
           f: landmarkToCode.get(c.landmark) ?? 0,
           v: normalizeTileVariant(c.v),
         })),
-        dungeonCoords: exportCells
-          .filter((c) => dungeonLandmarks.has(c.landmark))
-          .map((c) => `${c.q},${c.r}`),
         campCoords: exportCells
           .filter((c) => campLandmarks.has(c.landmark))
           .map((c) => `${c.q},${c.r}`),
