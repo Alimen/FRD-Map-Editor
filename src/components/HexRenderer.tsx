@@ -9,11 +9,17 @@ import { TERRAIN_CONFIGS, STYLE_CONFIGS } from "../constants";
 import { axialToPixel } from "../hexLayout";
 import { getTravelEventColor } from "../travelEventColors";
 
+const campLandmarks = new Set<LandmarkType>([
+  LandmarkType.MAIN_CAMP,
+  LandmarkType.SUB_CAMP,
+]);
+
 interface HexRendererProps {
   cell: HexCell;
   size: number;
   isSelected?: boolean;
   travelEvent?: string;
+  campTag?: string;
 }
 
 const HexRendererComponent: React.FC<HexRendererProps> = ({
@@ -21,6 +27,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   size,
   isSelected,
   travelEvent,
+  campTag,
 }) => {
   const { q, r, terrain, landmark, style } = cell;
 
@@ -155,6 +162,20 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   const eventMarkerX = cx + size * 0.42;
   const eventMarkerY = cy - size * 0.46;
   const eventColor = travelEvent ? getTravelEventColor(travelEvent) : null;
+  const campTagLabel = campTag?.trim() ?? "";
+  const visibleCampTag = campTagLabel && campTagLabel !== "na" ? campTagLabel : "";
+  const campTagColor = visibleCampTag ? getTravelEventColor(visibleCampTag) : null;
+  const campTagMarkerX = cx - size * 0.42;
+  const campTagMarkerY = cy - size * 0.46;
+  const campTagFontSize = Math.max(6, Math.min(10, size * 0.15));
+  const campTagHorizontalPadding = Math.max(8, size * 0.16);
+  const campTagBadgeWidth = Math.max(
+    24,
+    Math.min(size * 1.45, visibleCampTag.length * campTagFontSize * 0.66 + campTagHorizontalPadding * 2)
+  );
+  const campTagBadgeHeight = Math.max(14, size * 0.3);
+  const campTagTextWidth = campTagBadgeWidth - campTagHorizontalPadding;
+  const shouldCompressCampTagText = visibleCampTag.length * campTagFontSize * 0.66 > campTagTextWidth;
 
   return (
     <g
@@ -211,6 +232,34 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
             fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
           >
             EV
+          </text>
+        </g>
+      )}
+
+      {hasTerrain && campLandmarks.has(landmark) && visibleCampTag && campTagColor && (
+        <g className="pointer-events-none" filter="drop-shadow(0px 1px 2px rgba(0,0,0,0.25))">
+          <rect
+            x={campTagMarkerX - campTagBadgeWidth / 2}
+            y={campTagMarkerY - campTagBadgeHeight / 2}
+            width={campTagBadgeWidth}
+            height={campTagBadgeHeight}
+            rx={Math.max(3, size * 0.07)}
+            fill={campTagColor.fill}
+            stroke={campTagColor.stroke}
+            strokeWidth={Math.max(1, size * 0.03)}
+          />
+          <text
+            x={campTagMarkerX}
+            y={campTagMarkerY + campTagFontSize * 0.35}
+            textAnchor="middle"
+            fontSize={campTagFontSize}
+            fontWeight="800"
+            fill={campTagColor.text}
+            fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+            textLength={shouldCompressCampTagText ? campTagTextWidth : undefined}
+            lengthAdjust={shouldCompressCampTagText ? "spacingAndGlyphs" : undefined}
+          >
+            {visibleCampTag}
           </text>
         </g>
       )}

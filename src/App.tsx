@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { HexCell, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
+import { CampTagMap, HexCell, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "./constants";
@@ -92,18 +92,21 @@ const campLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_CAMP,
   LandmarkType.SUB_CAMP,
 ]);
+const DEFAULT_CAMP_TAG = "na";
 
 interface AtlasMap {
   id: string;
   radius: number;
   cells: Record<string, HexCell>;
   travelEvents: TravelEventMap;
+  campTags: CampTagMap;
 }
 
 interface HistorySnapshot {
   cells: Record<string, HexCell>;
   radius: number;
   travelEvents: TravelEventMap;
+  campTags: CampTagMap;
 }
 
 const getNextMapId = (maps: AtlasMap[]) => {
@@ -198,24 +201,32 @@ export default function App() {
   const cellsRef = useRef<Record<string, HexCell>>(cells);
   const [travelEvents, setTravelEvents] = useState<TravelEventMap>({});
   const travelEventsRef = useRef<TravelEventMap>({});
+  const [campTags, setCampTags] = useState<CampTagMap>({});
+  const campTagsRef = useRef<CampTagMap>({});
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
       travelEvents: {},
+      campTags: {},
     },
   ]);
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
 
   // Hot selection editing states
-  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "travelEvent">("terrain");
+  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "travelEvent" | "campTag">("terrain");
   const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
   const [selectedTravelEvent, setSelectedTravelEvent] = useState<string>("");
+  const [selectedCampTag, setSelectedCampTag] = useState<string>(DEFAULT_CAMP_TAG);
   const [loadedTravelEventBrushes, setLoadedTravelEventBrushes] = useState<{ eventIds: string[]; version: number }>({
     eventIds: [],
+    version: 0,
+  });
+  const [loadedCampTagBrushes, setLoadedCampTagBrushes] = useState<{ tags: string[]; version: number }>({
+    tags: [DEFAULT_CAMP_TAG],
     version: 0,
   });
 
@@ -230,6 +241,7 @@ export default function App() {
   const inspectorStyleRef = useRef<HTMLSpanElement | null>(null);
   const inspectorVariantRef = useRef<HTMLSpanElement | null>(null);
   const inspectorTravelEventRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorCampTagRef = useRef<HTMLSpanElement | null>(null);
 
   // Dynamic camera refs avoid rerendering the map while panning or zooming.
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -316,6 +328,9 @@ export default function App() {
     if (inspectorTravelEventRef.current) {
       inspectorTravelEventRef.current.textContent = travelEventsRef.current[`${cell.q},${cell.r}`] || "無";
     }
+    if (inspectorCampTagRef.current) {
+      inspectorCampTagRef.current.textContent = campTagsRef.current[`${cell.q},${cell.r}`] || "無";
+    }
   }, []);
 
   const updateHoverOverlay = useCallback((cell: HexCell | null) => {
@@ -358,39 +373,58 @@ export default function App() {
       radius,
       cells: JSON.parse(JSON.stringify(cells)),
       travelEvents: JSON.parse(JSON.stringify(travelEvents)),
+      campTags: JSON.parse(JSON.stringify(campTags)),
     } : map);
-  }, [maps, selectedMapIndex, cells, radius, travelEvents]);
+  }, [maps, selectedMapIndex, cells, radius, travelEvents, campTags]);
 
-  const updateCurrentMapSnapshot = useCallback((nextCells: Record<string, HexCell>, nextRadius: number, nextTravelEvents: TravelEventMap = travelEventsRef.current) => {
+  const updateCurrentMapSnapshot = useCallback((
+    nextCells: Record<string, HexCell>,
+    nextRadius: number,
+    nextTravelEvents: TravelEventMap = travelEventsRef.current,
+    nextCampTags: CampTagMap = campTagsRef.current
+  ) => {
     setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
       ...map,
       radius: nextRadius,
       cells: JSON.parse(JSON.stringify(nextCells)),
       travelEvents: JSON.parse(JSON.stringify(nextTravelEvents)),
+      campTags: JSON.parse(JSON.stringify(nextCampTags)),
     } : map));
   }, [selectedMapIndex]);
 
-  const resetHistory = useCallback((nextCells: Record<string, HexCell>, nextRadius: number, nextTravelEvents: TravelEventMap) => {
+  const resetHistory = useCallback((
+    nextCells: Record<string, HexCell>,
+    nextRadius: number,
+    nextTravelEvents: TravelEventMap,
+    nextCampTags: CampTagMap
+  ) => {
     setHistory([{
       cells: JSON.parse(JSON.stringify(nextCells)),
       radius: nextRadius,
       travelEvents: JSON.parse(JSON.stringify(nextTravelEvents)),
+      campTags: JSON.parse(JSON.stringify(nextCampTags)),
     }]);
     setHistoryIndex(0);
   }, []);
 
   // Initialize History with current state
   useEffect(() => {
-    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS, travelEvents: {} };
+    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS, travelEvents: {}, campTags: {} };
     setHistory([initialState]);
     setHistoryIndex(0);
   }, []);
 
-  const pushToHistory = (newCells: Record<string, HexCell>, newRadius: number, newTravelEvents: TravelEventMap) => {
+  const pushToHistory = (
+    newCells: Record<string, HexCell>,
+    newRadius: number,
+    newTravelEvents: TravelEventMap,
+    newCampTags: CampTagMap
+  ) => {
     const freshState = {
       cells: JSON.parse(JSON.stringify(newCells)),
       radius: newRadius,
       travelEvents: JSON.parse(JSON.stringify(newTravelEvents)),
+      campTags: JSON.parse(JSON.stringify(newCampTags)),
     };
     // Slice off any REDO redoable states
     const sliceHistory = history.slice(0, historyIndex + 1);
@@ -418,10 +452,12 @@ export default function App() {
     setSelectedMapIndex(mapIndex);
     cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(targetMap.travelEvents));
+    campTagsRef.current = JSON.parse(JSON.stringify(targetMap.campTags));
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
+    setCampTags(campTagsRef.current);
     setRadius(targetMap.radius);
-    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents);
+    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents, targetMap.campTags);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -433,16 +469,19 @@ export default function App() {
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
       travelEvents: {},
+      campTags: {},
     };
 
     setMaps([...nextMaps, nextMap]);
     setSelectedMapIndex(nextMaps.length);
     cellsRef.current = JSON.parse(JSON.stringify(nextMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(nextMap.travelEvents));
+    campTagsRef.current = JSON.parse(JSON.stringify(nextMap.campTags));
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
+    setCampTags(campTagsRef.current);
     setRadius(nextMap.radius);
-    resetHistory(nextMap.cells, nextMap.radius, nextMap.travelEvents);
+    resetHistory(nextMap.cells, nextMap.radius, nextMap.travelEvents, nextMap.campTags);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -455,16 +494,19 @@ export default function App() {
       radius: sourceMap.radius,
       cells: JSON.parse(JSON.stringify(sourceMap.cells)),
       travelEvents: JSON.parse(JSON.stringify(sourceMap.travelEvents)),
+      campTags: JSON.parse(JSON.stringify(sourceMap.campTags)),
     };
 
     setMaps([...nextMaps, duplicatedMap]);
     setSelectedMapIndex(nextMaps.length);
     cellsRef.current = JSON.parse(JSON.stringify(duplicatedMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(duplicatedMap.travelEvents));
+    campTagsRef.current = JSON.parse(JSON.stringify(duplicatedMap.campTags));
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
+    setCampTags(campTagsRef.current);
     setRadius(duplicatedMap.radius);
-    resetHistory(duplicatedMap.cells, duplicatedMap.radius, duplicatedMap.travelEvents);
+    resetHistory(duplicatedMap.cells, duplicatedMap.radius, duplicatedMap.travelEvents, duplicatedMap.campTags);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -482,10 +524,12 @@ export default function App() {
     setSelectedMapIndex(nextSelectedIndex);
     cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(targetMap.travelEvents));
+    campTagsRef.current = JSON.parse(JSON.stringify(targetMap.campTags));
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
+    setCampTags(campTagsRef.current);
     setRadius(targetMap.radius);
-    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents);
+    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents, targetMap.campTags);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -520,10 +564,12 @@ export default function App() {
       const targetState = history[prevIndex];
       cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
       travelEventsRef.current = JSON.parse(JSON.stringify(targetState.travelEvents));
+      campTagsRef.current = JSON.parse(JSON.stringify(targetState.campTags));
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
+      setCampTags(campTagsRef.current);
       setRadius(targetState.radius);
-      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents, targetState.campTags);
       setHistoryIndex(prevIndex);
       setHoveredCellImperatively(null);
     }
@@ -536,10 +582,12 @@ export default function App() {
       const targetState = history[nextIndex];
       cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
       travelEventsRef.current = JSON.parse(JSON.stringify(targetState.travelEvents));
+      campTagsRef.current = JSON.parse(JSON.stringify(targetState.campTags));
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
+      setCampTags(campTagsRef.current);
       setRadius(targetState.radius);
-      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents, targetState.campTags);
       setHistoryIndex(nextIndex);
       setHoveredCellImperatively(null);
     }
@@ -571,13 +619,18 @@ export default function App() {
     const nextTravelEvents = Object.fromEntries(
       Object.entries(travelEventsRef.current).filter(([key]) => Boolean(newCells[key]))
     ) as TravelEventMap;
-    pushToHistory(newCells, newRadius, nextTravelEvents);
+    const nextCampTags = Object.fromEntries(
+      Object.entries(campTagsRef.current).filter(([key]) => Boolean(newCells[key]))
+    ) as CampTagMap;
+    pushToHistory(newCells, newRadius, nextTravelEvents, nextCampTags);
     cellsRef.current = newCells;
     travelEventsRef.current = nextTravelEvents;
+    campTagsRef.current = nextCampTags;
     setCells(newCells);
     setTravelEvents(nextTravelEvents);
+    setCampTags(nextCampTags);
     setRadius(newRadius);
-    updateCurrentMapSnapshot(newCells, newRadius, nextTravelEvents);
+    updateCurrentMapSnapshot(newCells, newRadius, nextTravelEvents, nextCampTags);
     setHoveredCellImperatively(null);
     
     // Auto center map camera
@@ -592,6 +645,7 @@ export default function App() {
 
     let updatedCell = { ...previous };
     let nextTravelEvents = travelEventsRef.current;
+    let nextCampTags = campTagsRef.current;
 
     if (activeLayer === "terrain") {
       updatedCell.terrain = selectedTerrain;
@@ -602,12 +656,24 @@ export default function App() {
           nextTravelEvents = { ...travelEventsRef.current };
           delete nextTravelEvents[key];
         }
+        if (campTagsRef.current[key]) {
+          nextCampTags = { ...campTagsRef.current };
+          delete nextCampTags[key];
+        }
       }
     } else if (activeLayer === "landmark") {
       if (previous.terrain === TerrainType.NONE) {
         return;
       }
       updatedCell.landmark = selectedLandmark;
+      if (campLandmarks.has(selectedLandmark)) {
+        if (!campTagsRef.current[key]) {
+          nextCampTags = { ...campTagsRef.current, [key]: DEFAULT_CAMP_TAG };
+        }
+      } else if (campTagsRef.current[key]) {
+        nextCampTags = { ...campTagsRef.current };
+        delete nextCampTags[key];
+      }
     } else if (activeLayer === "style") {
       if (previous.terrain === TerrainType.NONE) {
         return;
@@ -632,6 +698,20 @@ export default function App() {
         }
         nextTravelEvents = { ...travelEventsRef.current, [key]: eventId };
       }
+    } else if (activeLayer === "campTag") {
+      if (!campLandmarks.has(previous.landmark)) {
+        return;
+      }
+      const tag = selectedCampTag.trim();
+      if (!tag) {
+        return;
+      }
+      const previousTag = campTagsRef.current[key] || "";
+
+      if (previousTag === tag) {
+        return;
+      }
+      nextCampTags = { ...campTagsRef.current, [key]: tag };
     }
 
     if (updatedCell.terrain !== previous.terrain) {
@@ -643,7 +723,8 @@ export default function App() {
       updatedCell.terrain === previous.terrain &&
       updatedCell.landmark === previous.landmark &&
       updatedCell.style === previous.style &&
-      nextTravelEvents === travelEventsRef.current
+      nextTravelEvents === travelEventsRef.current &&
+      nextCampTags === campTagsRef.current
     ) {
       return;
     }
@@ -651,16 +732,18 @@ export default function App() {
     const nextCells = { ...cellsRef.current, [key]: updatedCell };
     cellsRef.current = nextCells;
     travelEventsRef.current = nextTravelEvents;
+    campTagsRef.current = nextCampTags;
     setCells(nextCells);
     setTravelEvents(nextTravelEvents);
-    updateCurrentMapSnapshot(nextCells, radius, nextTravelEvents);
+    setCampTags(nextCampTags);
+    updateCurrentMapSnapshot(nextCells, radius, nextTravelEvents, nextCampTags);
     setHoveredCellImperatively(updatedCell);
 
     // Accumulate alterations within the active paint stroke
     if (strokeChangesRef.current) {
       strokeChangesRef.current[key] = true;
     }
-  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, selectedTravelEvent, updateCurrentMapSnapshot, setHoveredCellImperatively]);
+  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, selectedTravelEvent, selectedCampTag, updateCurrentMapSnapshot, setHoveredCellImperatively]);
 
   // Canvas Drag/Pan
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
@@ -712,7 +795,7 @@ export default function App() {
 
       // Stroke holds paint changes? Commit as a individual historic state
       if (strokeChangesRef.current && Object.keys(strokeChangesRef.current).length > 0) {
-        pushToHistory(cellsRef.current, radius, travelEventsRef.current);
+        pushToHistory(cellsRef.current, radius, travelEventsRef.current, campTagsRef.current);
       }
       strokeChangesRef.current = null;
     };
@@ -767,7 +850,10 @@ export default function App() {
         })),
         campTags: exportCells
           .filter((c) => campLandmarks.has(c.landmark))
-          .map((c) => ({ c: `${c.q},${c.r}`, t: "tag" })),
+          .map((c) => {
+            const coord = `${c.q},${c.r}`;
+            return { c: coord, t: map.campTags[coord]?.trim() || DEFAULT_CAMP_TAG };
+          }),
         travelEvents: Object.entries(map.travelEvents)
           .filter(([coord, eventId]) => exportCellKeys.has(coord) && eventId.trim())
           .map(([coord, eventId]) => ({ c: coord, v: eventId })),
@@ -837,6 +923,31 @@ export default function App() {
       });
     }
 
+    const importedCampTags = data.world?.campTags ?? data.campTags ?? [];
+    const nextCampTags: CampTagMap = {};
+
+    if (Array.isArray(importedCampTags)) {
+      importedCampTags.forEach((campTag: any) => {
+        if (
+          typeof campTag?.c === "string" &&
+          typeof campTag?.t === "string" &&
+          incomingCells[campTag.c] &&
+          campLandmarks.has(incomingCells[campTag.c].landmark)
+        ) {
+          const tag = campTag.t.trim();
+          if (tag) {
+            nextCampTags[campTag.c] = tag;
+          }
+        }
+      });
+    }
+
+    Object.entries(incomingCells).forEach(([coord, cell]) => {
+      if (campLandmarks.has(cell.landmark) && !nextCampTags[coord]) {
+        nextCampTags[coord] = DEFAULT_CAMP_TAG;
+      }
+    });
+
     const nextRadius = typeof data.world?.radius === "number"
       ? data.world.radius
       : typeof data.radius === "number"
@@ -848,6 +959,7 @@ export default function App() {
       radius: nextRadius,
       cells: { ...createNoTerrainCells(nextRadius), ...incomingCells },
       travelEvents: nextTravelEvents,
+      campTags: nextCampTags,
     };
   };
 
@@ -907,17 +1019,27 @@ export default function App() {
       const importedTravelEventIds = Array.from(new Set(
         importedMaps.flatMap((map) => Object.values(map.travelEvents))
       )).sort((a, b) => a.localeCompare(b));
+      const importedCampTags = Array.from(new Set([
+        DEFAULT_CAMP_TAG,
+        ...importedMaps.flatMap((map) => Object.values(map.campTags)),
+      ])).sort((a, b) => a.localeCompare(b));
 
       setMaps(importedMaps);
       setSelectedMapIndex(0);
       setRadius(firstMap.radius);
       cellsRef.current = JSON.parse(JSON.stringify(firstMap.cells));
       travelEventsRef.current = JSON.parse(JSON.stringify(firstMap.travelEvents));
+      campTagsRef.current = JSON.parse(JSON.stringify(firstMap.campTags));
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
-      resetHistory(firstMap.cells, firstMap.radius, firstMap.travelEvents);
+      setCampTags(campTagsRef.current);
+      resetHistory(firstMap.cells, firstMap.radius, firstMap.travelEvents, firstMap.campTags);
       setLoadedTravelEventBrushes((prev) => ({
         eventIds: importedTravelEventIds,
+        version: prev.version + 1,
+      }));
+      setLoadedCampTagBrushes((prev) => ({
+        tags: importedCampTags,
         version: prev.version + 1,
       }));
       setHoveredCellImperatively(null);
@@ -945,6 +1067,9 @@ export default function App() {
         selectedTravelEvent={selectedTravelEvent}
         setSelectedTravelEvent={setSelectedTravelEvent}
         loadedTravelEventBrushes={loadedTravelEventBrushes}
+        selectedCampTag={selectedCampTag}
+        setSelectedCampTag={setSelectedCampTag}
+        loadedCampTagBrushes={loadedCampTagBrushes}
         radius={radius}
         maxGridRadius={MAX_MAP_RADIUS}
         onResizeGrid={handleResizeGrid}
@@ -1078,9 +1203,15 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
-                <span className="text-slate-400 text-[10px]">事件:</span>
-                <span ref={inspectorTravelEventRef} className="font-mono font-semibold text-slate-700 truncate" />
+              <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-slate-400 text-[10px] shrink-0">事件:</span>
+                  <span ref={inspectorTravelEventRef} className="font-mono font-semibold text-slate-700 truncate" />
+                </div>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-slate-400 text-[10px] shrink-0">標籤:</span>
+                  <span ref={inspectorCampTagRef} className="font-mono font-semibold text-slate-700 truncate" />
+                </div>
               </div>
             </div>
           <div ref={inspectorEmptyRef} className="text-xs text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
@@ -1156,6 +1287,7 @@ export default function App() {
                     size={cellSize}
                     isSelected={false}
                     travelEvent={travelEvents[key]}
+                    campTag={campTags[key]}
                   />
                 );
               })}

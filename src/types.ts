@@ -38,15 +38,18 @@ export interface HexCell {
 }
 
 export type TravelEventMap = Record<string, string>;
+export type CampTagMap = Record<string, string>;
 
 export interface MapData {
   radius: number;
   cells: Record<string, HexCell>; // Key is "q,r"
   travelEvents?: TravelEventMap; // Key is "q,r", value is event id
+  campTags?: CampTagMap; // Key is "q,r", value is camp tag
 }
 
 export interface HistoryState {
   cells: Record<string, HexCell>;
   radius: number;
   travelEvents: TravelEventMap;
+  campTags: CampTagMap;
 }

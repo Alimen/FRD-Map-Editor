@@ -30,13 +30,17 @@ import {
   Map,
   ArrowUp,
   ArrowDown,
-  ScrollText
+  ScrollText,
+  Tag
 } from "lucide-react";
+
+type BrushLayer = "terrain" | "landmark" | "style" | "travelEvent" | "campTag";
+const DEFAULT_CAMP_TAG = "na";
 
 interface SidebarProps {
   // Painting Brush State
-  activeLayer: "terrain" | "landmark" | "style" | "travelEvent";
-  setActiveLayer: (layer: "terrain" | "landmark" | "style" | "travelEvent") => void;
+  activeLayer: BrushLayer;
+  setActiveLayer: (layer: BrushLayer) => void;
 
   selectedTerrain: TerrainType;
   setSelectedTerrain: (t: TerrainType) => void;
@@ -51,6 +55,12 @@ interface SidebarProps {
   setSelectedTravelEvent: (eventId: string) => void;
   loadedTravelEventBrushes: {
     eventIds: string[];
+    version: number;
+  };
+  selectedCampTag: string;
+  setSelectedCampTag: (tag: string) => void;
+  loadedCampTagBrushes: {
+    tags: string[];
     version: number;
   };
 
@@ -86,6 +96,14 @@ type SidebarGroupId = "mapAtlas" | "brush" | "history" | "stats" | "grid" | "jso
 
 const sortTravelEventBrushes = (eventIds: string[]) => {
   return [...eventIds].sort((a, b) => a.localeCompare(b));
+};
+
+const sortCampTagBrushes = (tags: string[]) => {
+  return [...tags].sort((a, b) => {
+    if (a === DEFAULT_CAMP_TAG) return -1;
+    if (b === DEFAULT_CAMP_TAG) return 1;
+    return a.localeCompare(b);
+  });
 };
 
 interface CollapsibleGroupProps {
@@ -139,6 +157,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   selectedTravelEvent,
   setSelectedTravelEvent,
   loadedTravelEventBrushes,
+  selectedCampTag,
+  setSelectedCampTag,
+  loadedCampTagBrushes,
   radius,
   maxGridRadius,
   onResizeGrid,
@@ -166,6 +187,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
   const [newTravelEventInput, setNewTravelEventInput] = useState<string>("");
   const [travelEventBrushes, setTravelEventBrushes] = useState<string[]>([]);
+  const [newCampTagInput, setNewCampTagInput] = useState<string>("");
+  const [campTagBrushes, setCampTagBrushes] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<SidebarGroupId, boolean>>({
     mapAtlas: true,
@@ -196,6 +219,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setSelectedTravelEvent("");
     setNewTravelEventInput("");
   }, [loadedTravelEventBrushes, setSelectedTravelEvent]);
+
+  useEffect(() => {
+    setCampTagBrushes(sortCampTagBrushes(Array.from(new Set([DEFAULT_CAMP_TAG, ...loadedCampTagBrushes.tags]))));
+    setSelectedCampTag(DEFAULT_CAMP_TAG);
+    setNewCampTagInput("");
+  }, [loadedCampTagBrushes, setSelectedCampTag]);
 
   // Handle direct file uploads
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,6 +316,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setTravelEventBrushes((prev) => prev.filter((brushEventId) => brushEventId !== eventId));
     if (selectedTravelEvent === eventId) {
       setSelectedTravelEvent("");
+    }
+  };
+
+  const handleAddCampTagBrush = (e: React.FormEvent) => {
+    e.preventDefault();
+    const tag = newCampTagInput.trim();
+    if (!tag) {
+      return;
+    }
+
+    setCampTagBrushes((prev) => {
+      return prev.includes(tag) ? prev : sortCampTagBrushes([...prev, tag]);
+    });
+    setSelectedCampTag(tag);
+    setNewCampTagInput("");
+  };
+
+  const handleRemoveCampTagBrush = (tag: string) => {
+    if (tag === DEFAULT_CAMP_TAG) {
+      return;
+    }
+    const nextBrushes = campTagBrushes.filter((brushTag) => brushTag !== tag);
+    setCampTagBrushes(nextBrushes);
+    if (selectedCampTag === tag) {
+      setSelectedCampTag(nextBrushes[0] ?? DEFAULT_CAMP_TAG);
     }
   };
 
@@ -463,7 +517,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onToggle={() => toggleGroup("brush")}
         >
           <div className="space-y-3">
-            <div className="grid grid-cols-4 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+            <div className="grid grid-cols-5 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
               <button
                 id="layer-btn-terrain"
                 onClick={() => setActiveLayer("terrain")}
@@ -511,6 +565,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               >
                 <ScrollText className="w-4 h-4" />
                 <span>事件</span>
+              </button>
+              <button
+                id="layer-btn-camp-tag"
+                onClick={() => setActiveLayer("campTag")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "campTag"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Tag className="w-4 h-4" />
+                <span>標籤</span>
               </button>
             </div>
           </div>
@@ -617,7 +683,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" />
                     <span className="text-xs font-medium text-slate-700">
-                      無事件
+                      清除事件
                     </span>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -686,6 +752,83 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Plus className="w-4 h-4" />
                 </button>
               </form>
+            </div>
+          )}
+
+          {activeLayer === "campTag" && (
+            <div id="camp-tag-selector" className="space-y-3">
+              <span className="text-xs font-bold text-slate-500 block mb-2">指定營地標籤</span>
+              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                {campTagBrushes.map((tag) => {
+                  const tagColor = tag === DEFAULT_CAMP_TAG
+                    ? { fill: "#e2e8f0", stroke: "#94a3b8" }
+                    : getTravelEventColor(tag);
+
+                  return (
+                    <div
+                      key={tag}
+                      className={`w-full rounded-lg border transition-all flex items-stretch overflow-hidden ${
+                        selectedCampTag === tag
+                          ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                          : "bg-white/80 border-slate-200 hover:border-slate-300"
+                      }`}
+                    >
+                      <button
+                        onClick={() => setSelectedCampTag(tag)}
+                        className="flex-1 min-w-0 p-2 px-3 text-left flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div
+                            className="w-3.5 h-3.5 rounded-full border shrink-0"
+                            style={{
+                              backgroundColor: tagColor.fill,
+                              borderColor: tagColor.stroke,
+                            }}
+                          />
+                          <span className="text-xs font-medium text-slate-700 font-mono truncate">
+                            {tag === DEFAULT_CAMP_TAG ? "清除標籤 (na)" : tag}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </button>
+                      {tag !== DEFAULT_CAMP_TAG && (
+                        <button
+                          onClick={() => handleRemoveCampTagBrush(tag)}
+                          className="w-9 shrink-0 border-l border-slate-200/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
+                          title="移除營地標籤筆刷"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <form onSubmit={handleAddCampTagBrush} className="flex gap-2 items-center">
+                <div className="relative flex-1 min-w-0">
+                  <Tag className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="camp-tag-input"
+                    type="text"
+                    value={newCampTagInput}
+                    onChange={(e) => setNewCampTagInput(e.target.value)}
+                    placeholder="tag1"
+                    className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <button
+                  id="camp-tag-add-btn"
+                  type="submit"
+                  className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"
+                  title="新增營地標籤筆刷"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </form>
+              <div className="text-[10px] text-slate-400 leading-relaxed">
+                * 此筆刷只會套用在大營地或小營地。
+              </div>
             </div>
           )}
 
