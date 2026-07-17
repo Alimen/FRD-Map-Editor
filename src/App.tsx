@@ -88,11 +88,6 @@ const normalizeTileVariant = (value: unknown) => {
   return Math.max(0, Math.min(MAX_TILE_VARIANT, Math.round(value)));
 };
 
-const campLandmarks = new Set<LandmarkType>([
-  LandmarkType.MAIN_CAMP,
-  LandmarkType.SUB_CAMP,
-]);
-
 interface AtlasMap {
   id: string;
   radius: number;
@@ -765,9 +760,6 @@ export default function App() {
           f: landmarkToCode.get(c.landmark) ?? 0,
           v: normalizeTileVariant(c.v),
         })),
-        campCoords: exportCells
-          .filter((c) => campLandmarks.has(c.landmark))
-          .map((c) => `${c.q},${c.r}`),
         travelEvents: Object.entries(map.travelEvents)
           .filter(([coord, eventId]) => exportCellKeys.has(coord) && eventId.trim())
           .map(([coord, eventId]) => ({ c: coord, v: eventId })),
