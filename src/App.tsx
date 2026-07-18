@@ -75,7 +75,7 @@ const formatMapId = (index: number) => index.toString().padStart(3, "0");
 const DEFAULT_MAP_ID = formatMapId(1);
 const DEFAULT_MAP_RADIUS = 30;
 const NEW_MAP_FILL_RADIUS = 5;
-const MAX_MAP_RADIUS = 40;
+const MAX_MAP_RADIUS = 80;
 const MAX_TILE_VARIANT = 30;
 
 const rollTileVariant = () => Math.floor(Math.random() * (MAX_TILE_VARIANT + 1));
