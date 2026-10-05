@@ -84,6 +84,8 @@ interface SidebarProps {
   onDeleteMap: () => void;
   onRenameMap: (nextId: string) => void;
   onMoveMap: (direction: -1 | 1) => void;
+  mapLevel: number;
+  onChangeMapLevel: (level: number) => void;
 
   // JSON Operations
   exportJSON: () => void;
@@ -92,7 +94,7 @@ interface SidebarProps {
   getCurrentJSON: () => string;
 }
 
-type SidebarGroupId = "mapAtlas" | "brush" | "history" | "stats" | "grid" | "json";
+type SidebarGroupId = "mapAtlas" | "mapLevel" | "brush" | "history" | "stats" | "grid" | "json";
 
 const sortTravelEventBrushes = (eventIds: string[]) => {
   return [...eventIds].sort((a, b) => a.localeCompare(b));
@@ -175,6 +177,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onDeleteMap,
   onRenameMap,
   onMoveMap,
+  mapLevel,
+  onChangeMapLevel,
   exportJSON,
   importJSON,
   terrainCounts,
@@ -185,6 +189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [inputRadiusInput, setInputRadiusInput] = useState<string>(String(radius));
   const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
+  const [mapLevelInput, setMapLevelInput] = useState<string>(String(mapLevel));
   const [newTravelEventInput, setNewTravelEventInput] = useState<string>("");
   const [travelEventBrushes, setTravelEventBrushes] = useState<string[]>([]);
   const [newCampTagInput, setNewCampTagInput] = useState<string>("");
@@ -192,6 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [copied, setCopied] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<SidebarGroupId, boolean>>({
     mapAtlas: true,
+    mapLevel: true,
     brush: true,
     history: true,
     stats: true,
@@ -213,6 +219,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     setMapNameInput(maps[selectedMapIndex]?.id ?? "");
   }, [maps, selectedMapIndex]);
+
+  useEffect(() => {
+    setMapLevelInput(String(mapLevel));
+  }, [mapLevel, maps, selectedMapIndex]);
 
   useEffect(() => {
     setTravelEventBrushes(sortTravelEventBrushes(loadedTravelEventBrushes.eventIds));
@@ -506,6 +516,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="text-[10px] text-slate-400 leading-relaxed">
               * 縮小半徑會裁切外圍格子，放大則會保留當前內容並往外拓展。
             </div>
+          </div>
+        </CollapsibleGroup>
+
+        {/*Map Level*/}
+        <CollapsibleGroup
+          title="地圖等級"
+          icon={<BarChart3 className="w-3.5 h-3.5 text-slate-400" />}
+          expanded={expandedGroups.mapLevel}
+          onToggle={() => toggleGroup("mapLevel")}
+        >
+          <div className="relative">
+            <input
+              id="map-level-input"
+              aria-label="地圖等級"
+              type="number"
+              min="0"
+              step="1"
+              value={mapLevelInput}
+              onChange={(e) => {
+                const value = e.target.value;
+                setMapLevelInput(value);
+                const level = Number(value);
+                if (value.trim() && Number.isSafeInteger(level) && level >= 0) {
+                  onChangeMapLevel(level);
+                }
+              }}
+              onBlur={() => setMapLevelInput(String(mapLevel))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
+              className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">級</span>
           </div>
         </CollapsibleGroup>
 

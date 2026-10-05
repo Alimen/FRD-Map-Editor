@@ -96,6 +96,7 @@ const DEFAULT_CAMP_TAG = "";
 
 interface AtlasMap {
   id: string;
+  level: number;
   radius: number;
   cells: Record<string, HexCell>;
   travelEvents: TravelEventMap;
@@ -206,6 +207,7 @@ export default function App() {
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
+      level: 0,
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
       travelEvents: {},
@@ -466,6 +468,7 @@ export default function App() {
     const nextMaps = getMapsWithCurrentSnapshot();
     const nextMap: AtlasMap = {
       id: getNextMapId(nextMaps),
+      level: 0,
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
       travelEvents: {},
@@ -491,6 +494,7 @@ export default function App() {
     const sourceMap = nextMaps[selectedMapIndex];
     const duplicatedMap: AtlasMap = {
       id: getNextMapId(nextMaps),
+      level: sourceMap.level,
       radius: sourceMap.radius,
       cells: JSON.parse(JSON.stringify(sourceMap.cells)),
       travelEvents: JSON.parse(JSON.stringify(sourceMap.travelEvents)),
@@ -539,6 +543,17 @@ export default function App() {
     setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
       ...map,
       id: sanitizedId || map.id,
+    } : map));
+  };
+
+  const handleChangeMapLevel = (level: number) => {
+    if (!Number.isSafeInteger(level) || level < 0) {
+      return;
+    }
+
+    setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
+      ...map,
+      level,
     } : map));
   };
 
@@ -836,6 +851,7 @@ export default function App() {
     const exportCellKeys = new Set(exportCells.map((c) => `${c.q},${c.r}`));
     return {
       id: map.id,
+      level: map.level,
       world: {
         radius: map.radius,
         tiles: exportCells.map((c) => ({
@@ -950,6 +966,7 @@ export default function App() {
 
     return {
       id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallbackId,
+      level: Number.isSafeInteger(data.level) && data.level >= 0 ? data.level : 0,
       radius: nextRadius,
       cells: { ...createNoTerrainCells(nextRadius), ...incomingCells },
       travelEvents: nextTravelEvents,
@@ -1079,6 +1096,8 @@ export default function App() {
         onDeleteMap={handleDeleteMap}
         onRenameMap={handleRenameMap}
         onMoveMap={handleMoveMap}
+        mapLevel={maps[selectedMapIndex].level}
+        onChangeMapLevel={handleChangeMapLevel}
         exportJSON={handleExportJSON}
         importJSON={handleImportJSON}
         terrainCounts={terrainCounts}
