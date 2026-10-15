@@ -8,6 +8,7 @@ import { HexCell, TerrainType, LandmarkType, StyleVariant } from "../types";
 import { TERRAIN_CONFIGS, STYLE_CONFIGS } from "../constants";
 import { axialToPixel } from "../hexLayout";
 import { getTravelEventColor } from "../travelEventColors";
+import { DEFAULT_DIFFICULTY, DIFFICULTY_COLORS } from "../difficulty";
 
 const campLandmarks = new Set<LandmarkType>([
   LandmarkType.MAIN_CAMP,
@@ -20,6 +21,7 @@ interface HexRendererProps {
   isSelected?: boolean;
   travelEvent?: string;
   campTag?: string;
+  showDifficulty?: boolean;
 }
 
 const HexRendererComponent: React.FC<HexRendererProps> = ({
@@ -28,6 +30,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   isSelected,
   travelEvent,
   campTag,
+  showDifficulty = false,
 }) => {
   const { q, r, terrain, landmark, style } = cell;
 
@@ -153,6 +156,7 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
   };
 
   // Determine standard hex styling
+  const difficulty = cell.difficulty ?? DEFAULT_DIFFICULTY;
   const fillColor = hasTerrain ? tConfig.color : "transparent";
   const strokeColor = isSelected ? "#3b82f6" : sConfig.borderColor || tConfig.borderColor;
   const strokeWidth = isSelected ? 3.5 : 1.2;
@@ -260,6 +264,24 @@ const HexRendererComponent: React.FC<HexRendererProps> = ({
             lengthAdjust={shouldCompressCampTagText ? "spacingAndGlyphs" : undefined}
           >
             {visibleCampTag}
+          </text>
+        </g>
+      )}
+
+      {hasTerrain && showDifficulty && (
+        <g className="pointer-events-none" aria-label={`困難度 ${difficulty}`}>
+          <circle cx={cx} cy={cy} r={size * 0.31} fill={DIFFICULTY_COLORS[difficulty]} stroke="#334155" strokeWidth={1} />
+          <text
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={size * 0.4}
+            fontWeight="800"
+            fill={difficulty === 5 ? "#ffffff" : "#0f172a"}
+            fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+          >
+            {difficulty}
           </text>
         </g>
       )}

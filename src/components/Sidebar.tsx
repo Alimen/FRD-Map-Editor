@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { TerrainType, LandmarkType, StyleVariant } from "../types";
+import { BrushLayer, Difficulty, TerrainType, LandmarkType, StyleVariant } from "../types";
+import { DIFFICULTIES, DIFFICULTY_COLORS } from "../difficulty";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "../constants";
 import { getTravelEventColor } from "../travelEventColors";
 import {
@@ -31,16 +32,18 @@ import {
   ArrowUp,
   ArrowDown,
   ScrollText,
-  Tag
+  Tag,
+  Gauge
 } from "lucide-react";
 
-type BrushLayer = "terrain" | "landmark" | "style" | "travelEvent" | "campTag";
 const DEFAULT_CAMP_TAG = "";
 
 interface SidebarProps {
   // Painting Brush State
   activeLayer: BrushLayer;
   setActiveLayer: (layer: BrushLayer) => void;
+  selectedDifficulty: Difficulty;
+  setSelectedDifficulty: (difficulty: Difficulty) => void;
 
   selectedTerrain: TerrainType;
   setSelectedTerrain: (t: TerrainType) => void;
@@ -150,6 +153,8 @@ const CollapsibleGroup: React.FC<CollapsibleGroupProps> = ({
 export const Sidebar: React.FC<SidebarProps> = ({
   activeLayer,
   setActiveLayer,
+  selectedDifficulty,
+  setSelectedDifficulty,
   selectedTerrain,
   setSelectedTerrain,
   selectedLandmark,
@@ -562,7 +567,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onToggle={() => toggleGroup("brush")}
         >
           <div className="space-y-3">
-            <div className="grid grid-cols-5 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
+            <div className="grid grid-cols-3 gap-1.5 bg-slate-100/80 p-1 rounded-xl">
               <button
                 id="layer-btn-terrain"
                 onClick={() => setActiveLayer("terrain")}
@@ -623,11 +628,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Tag className="w-4 h-4" />
                 <span>標籤</span>
               </button>
+              <button
+                id="layer-btn-difficulty"
+                onClick={() => setActiveLayer("difficulty")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
+                  activeLayer === "difficulty"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Gauge className="w-4 h-4" />
+                <span>困難度</span>
+              </button>
             </div>
           </div>
 
         {/* Paint Item Selector */}
         <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-100">
+          {activeLayer === "difficulty" && (
+            <div id="difficulty-selector" className="space-y-3">
+              <span className="text-xs font-bold text-slate-500 block">選擇困難度</span>
+              <div className="grid grid-cols-3 gap-2">
+                {DIFFICULTIES.map((difficulty) => (
+                  <button
+                    key={difficulty}
+                    id={`difficulty-brush-${difficulty}`}
+                    type="button"
+                    aria-label={`困難度 ${difficulty}`}
+                    aria-pressed={selectedDifficulty === difficulty}
+                    onClick={() => setSelectedDifficulty(difficulty)}
+                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
+                      selectedDifficulty === difficulty
+                        ? "bg-white border-indigo-500 shadow-sm ring-1 ring-indigo-400"
+                        : "bg-white/80 border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <span className="w-3.5 h-3.5 rounded border border-black/10" style={{ backgroundColor: DIFFICULTY_COLORS[difficulty] }} />
+                    <span className="text-sm font-bold font-mono text-slate-700">{difficulty}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">點擊或拖曳有地形的格子以設定困難度。預設為 0，數字標記顏色越深代表困難度越高，格子底色保留地形資訊。</p>
+            </div>
+          )}
+
           {activeLayer === "terrain" && (
             <div id="terrain-selector" className="space-y-3">
               <span className="text-xs font-bold text-slate-500 block mb-2">選擇地形種類</span>

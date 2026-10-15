@@ -4,7 +4,8 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { CampTagMap, HexCell, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
+import { BrushLayer, CampTagMap, Difficulty, HexCell, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
+import { DEFAULT_DIFFICULTY, parseDifficulty } from "./difficulty";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "./constants";
@@ -30,6 +31,7 @@ const createCells = (radius: number, terrain: TerrainType): Record<string, HexCe
         landmark: LandmarkType.NONE,
         style: StyleVariant.NORMAL,
         v: rollTileVariant(),
+        difficulty: terrain === TerrainType.NONE ? null : DEFAULT_DIFFICULTY,
       };
     }
   }
@@ -217,7 +219,8 @@ export default function App() {
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
 
   // Hot selection editing states
-  const [activeLayer, setActiveLayer] = useState<"terrain" | "landmark" | "style" | "travelEvent" | "campTag">("terrain");
+  const [activeLayer, setActiveLayer] = useState<BrushLayer>("terrain");
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
   const [selectedStyle, setSelectedStyle] = useState<StyleVariant>(StyleVariant.DEMONIC);
@@ -242,6 +245,7 @@ export default function App() {
   const inspectorLandmarkRef = useRef<HTMLSpanElement | null>(null);
   const inspectorStyleRef = useRef<HTMLSpanElement | null>(null);
   const inspectorVariantRef = useRef<HTMLSpanElement | null>(null);
+  const inspectorDifficultyRef = useRef<HTMLSpanElement | null>(null);
   const inspectorTravelEventRef = useRef<HTMLSpanElement | null>(null);
   const inspectorCampTagRef = useRef<HTMLSpanElement | null>(null);
 
@@ -326,6 +330,9 @@ export default function App() {
     }
     if (inspectorVariantRef.current) {
       inspectorVariantRef.current.textContent = String(cell.terrain === TerrainType.NONE ? 0 : cell.v);
+    }
+    if (inspectorDifficultyRef.current) {
+      inspectorDifficultyRef.current.textContent = cell.terrain === TerrainType.NONE ? "—" : String(cell.difficulty);
     }
     if (inspectorTravelEventRef.current) {
       inspectorTravelEventRef.current.textContent = travelEventsRef.current[`${cell.q},${cell.r}`] || "無";
@@ -627,6 +634,7 @@ export default function App() {
             landmark: LandmarkType.NONE,
             style: StyleVariant.NORMAL,
             v: rollTileVariant(),
+            difficulty: null,
           };
         }
       }
@@ -665,6 +673,7 @@ export default function App() {
     if (activeLayer === "terrain") {
       updatedCell.terrain = selectedTerrain;
       if (selectedTerrain === TerrainType.NONE) {
+        updatedCell.difficulty = null;
         updatedCell.landmark = LandmarkType.NONE;
         updatedCell.style = StyleVariant.NORMAL;
         if (travelEventsRef.current[key]) {
@@ -675,7 +684,12 @@ export default function App() {
           nextCampTags = { ...campTagsRef.current };
           delete nextCampTags[key];
         }
+      } else if (previous.terrain === TerrainType.NONE) {
+        updatedCell.difficulty = DEFAULT_DIFFICULTY;
       }
+    } else if (activeLayer === "difficulty") {
+      if (previous.terrain === TerrainType.NONE) return;
+      updatedCell.difficulty = selectedDifficulty;
     } else if (activeLayer === "landmark") {
       if (previous.terrain === TerrainType.NONE) {
         return;
@@ -735,6 +749,7 @@ export default function App() {
       updatedCell.terrain === previous.terrain &&
       updatedCell.landmark === previous.landmark &&
       updatedCell.style === previous.style &&
+      updatedCell.difficulty === previous.difficulty &&
       nextTravelEvents === travelEventsRef.current &&
       nextCampTags === campTagsRef.current
     ) {
@@ -755,7 +770,7 @@ export default function App() {
     if (strokeChangesRef.current) {
       strokeChangesRef.current[key] = true;
     }
-  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, selectedTravelEvent, selectedCampTag, updateCurrentMapSnapshot, setHoveredCellImperatively]);
+  }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, selectedTravelEvent, selectedCampTag, selectedDifficulty, updateCurrentMapSnapshot, setHoveredCellImperatively]);
 
   // Canvas Drag/Pan
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
@@ -860,6 +875,7 @@ export default function App() {
           l: styleToCode.get(c.style) ?? 0,
           f: landmarkToCode.get(c.landmark) ?? 0,
           v: normalizeTileVariant(c.v),
+          d: c.difficulty ?? DEFAULT_DIFFICULTY,
         })),
         campTags: exportCells
           .filter((c) => campLandmarks.has(c.landmark))
@@ -899,6 +915,7 @@ export default function App() {
             landmark: landmarkByCode[c.f] ?? LandmarkType.NONE,
             style: styleByCode[c.l] ?? StyleVariant.NORMAL,
             v: normalizeTileVariant(c.v),
+            difficulty: parseDifficulty(c.d),
           };
         }
       } else if (typeof c.q === "number" && typeof c.r === "number") {
@@ -909,6 +926,7 @@ export default function App() {
           landmark: c.landmark || LandmarkType.NONE,
           style: c.style || StyleVariant.NORMAL,
           v: normalizeTileVariant(c.v),
+          difficulty: c.terrain === TerrainType.NONE ? null : parseDifficulty(c.difficulty !== undefined ? c.difficulty : c.d),
         };
       }
 
@@ -1069,6 +1087,8 @@ export default function App() {
       <Sidebar
         activeLayer={activeLayer}
         setActiveLayer={setActiveLayer}
+        selectedDifficulty={selectedDifficulty}
+        setSelectedDifficulty={setSelectedDifficulty}
         selectedTerrain={selectedTerrain}
         setSelectedTerrain={setSelectedTerrain}
         selectedLandmark={selectedLandmark}
@@ -1217,6 +1237,13 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-400 text-[10px]">困難度:</span>
+                  <span ref={inspectorDifficultyRef} className="font-mono font-semibold text-slate-700" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 text-xs text-slate-600">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span className="text-slate-400 text-[10px] shrink-0">事件:</span>
                   <span ref={inspectorTravelEventRef} className="font-mono font-semibold text-slate-700 truncate" />
@@ -1301,6 +1328,7 @@ export default function App() {
                     isSelected={false}
                     travelEvent={travelEvents[key]}
                     campTag={campTags[key]}
+                    showDifficulty={activeLayer === "difficulty"}
                   />
                 );
               })}
@@ -1314,7 +1342,7 @@ export default function App() {
                 style={{ display: "none", pointerEvents: "none" }}
               />
 
-              <g id="origin-flag" filter="drop-shadow(0px 2px 3px rgba(0,0,0,0.35))" style={{ pointerEvents: "none" }}>
+              <g id="origin-flag" filter="drop-shadow(0px 2px 3px rgba(0,0,0,0.35))" style={{ pointerEvents: "none", display: activeLayer === "difficulty" ? "none" : undefined }}>
                 <line
                   x1="0"
                   y1={cellSize * 0.38}

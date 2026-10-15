@@ -28,6 +28,9 @@ export enum StyleVariant {
   DRACONIC = "draconic",
 }
 
+export type Difficulty = 0 | 1 | 2 | 3 | 4 | 5;
+export type BrushLayer = "terrain" | "landmark" | "style" | "travelEvent" | "campTag" | "difficulty";
+
 export interface HexCell {
   q: number;
   r: number;
@@ -35,6 +38,7 @@ export interface HexCell {
   landmark: LandmarkType;
   style: StyleVariant;
   v: number;
+  difficulty: Difficulty | null; // null for cells without terrain
 }
 
 export type TravelEventMap = Record<string, string>;
