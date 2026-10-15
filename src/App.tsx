@@ -4,8 +4,9 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { BrushLayer, CampTagMap, Difficulty, HexCell, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
+import { BrushLayer, CampTagMap, Difficulty, HexCell, PaintTool, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
 import { DEFAULT_DIFFICULTY, parseDifficulty } from "./difficulty";
+import { fillRegion, paintTerrain } from "./mapPainting";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "./constants";
@@ -220,6 +221,8 @@ export default function App() {
 
   // Hot selection editing states
   const [activeLayer, setActiveLayer] = useState<BrushLayer>("terrain");
+  const [paintTool, setPaintTool] = useState<PaintTool>("brush");
+  const isBucketActive = paintTool === "bucket" && (activeLayer === "terrain" || activeLayer === "difficulty");
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>(DEFAULT_DIFFICULTY);
   const [selectedTerrain, setSelectedTerrain] = useState<TerrainType>(TerrainType.PLAIN);
   const [selectedLandmark, setSelectedLandmark] = useState<LandmarkType>(LandmarkType.MAIN_DUNGEON);
@@ -671,11 +674,8 @@ export default function App() {
     let nextCampTags = campTagsRef.current;
 
     if (activeLayer === "terrain") {
-      updatedCell.terrain = selectedTerrain;
+      updatedCell = paintTerrain(previous, selectedTerrain, rollTileVariant);
       if (selectedTerrain === TerrainType.NONE) {
-        updatedCell.difficulty = null;
-        updatedCell.landmark = LandmarkType.NONE;
-        updatedCell.style = StyleVariant.NORMAL;
         if (travelEventsRef.current[key]) {
           nextTravelEvents = { ...travelEventsRef.current };
           delete nextTravelEvents[key];
@@ -684,8 +684,6 @@ export default function App() {
           nextCampTags = { ...campTagsRef.current };
           delete nextCampTags[key];
         }
-      } else if (previous.terrain === TerrainType.NONE) {
-        updatedCell.difficulty = DEFAULT_DIFFICULTY;
       }
     } else if (activeLayer === "difficulty") {
       if (previous.terrain === TerrainType.NONE) return;
@@ -740,10 +738,6 @@ export default function App() {
       nextCampTags = { ...campTagsRef.current, [key]: tag };
     }
 
-    if (updatedCell.terrain !== previous.terrain) {
-      updatedCell.v = rollTileVariant();
-    }
-
     // Check if cell parameters actually changed to avoid saving redundant modifications
     if (
       updatedCell.terrain === previous.terrain &&
@@ -772,11 +766,43 @@ export default function App() {
     }
   }, [cells, radius, activeLayer, selectedTerrain, selectedLandmark, selectedStyle, selectedTravelEvent, selectedCampTag, selectedDifficulty, updateCurrentMapSnapshot, setHoveredCellImperatively]);
 
+  const fillCell = (targetCell: HexCell) => {
+    if (activeLayer !== "terrain" && activeLayer !== "difficulty") return;
+    const key = `${targetCell.q},${targetCell.r}`;
+    const result = fillRegion(
+      cellsRef.current,
+      travelEventsRef.current,
+      campTagsRef.current,
+      key,
+      activeLayer === "terrain"
+        ? { layer: "terrain", value: selectedTerrain }
+        : { layer: "difficulty", value: selectedDifficulty },
+      rollTileVariant,
+    );
+    if (!result) return;
+
+    cellsRef.current = result.cells;
+    travelEventsRef.current = result.travelEvents;
+    campTagsRef.current = result.campTags;
+    setCells(result.cells);
+    setTravelEvents(result.travelEvents);
+    setCampTags(result.campTags);
+    updateCurrentMapSnapshot(result.cells, radius, result.travelEvents, result.campTags);
+    pushToHistory(result.cells, radius, result.travelEvents, result.campTags);
+    setHoveredCellImperatively(result.cells[key]);
+  };
+
   // Canvas Drag/Pan
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     const targetCell = getCellFromPointer(e.clientX, e.clientY);
 
     if (e.button === 0 && targetCell) {
+      if (isBucketActive) {
+        setHoveredCellImperatively(targetCell);
+        fillCell(targetCell);
+        e.preventDefault();
+        return;
+      }
       isMouseDownRef.current = true;
       strokeChangesRef.current = {};
       setHoveredCellImperatively(targetCell);
@@ -790,7 +816,7 @@ export default function App() {
       panStartRef.current = { x: e.clientX - panXRef.current, y: e.clientY - panYRef.current };
       e.preventDefault();
     }
-  }, [getCellFromPointer, paintCell, setHoveredCellImperatively]);
+  }, [getCellFromPointer, paintCell, isBucketActive, fillCell, setHoveredCellImperatively]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
@@ -1087,6 +1113,8 @@ export default function App() {
       <Sidebar
         activeLayer={activeLayer}
         setActiveLayer={setActiveLayer}
+        paintTool={paintTool}
+        setPaintTool={setPaintTool}
         selectedDifficulty={selectedDifficulty}
         setSelectedDifficulty={setSelectedDifficulty}
         selectedTerrain={selectedTerrain}
@@ -1190,7 +1218,7 @@ export default function App() {
             <ul className="space-y-2 leading-relaxed font-sans">
               <li className="flex items-start gap-2 rounded-lg bg-slate-50/70 border border-slate-100 px-3 py-2">
                 <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-[10px] font-bold shrink-0">1</span>
-                <span><strong className="text-slate-800">拖曳著色：</strong>按住滑鼠左鍵並行經格子，可快速連續刷上選取的屬性。</span>
+                <span><strong className="text-slate-800">編輯格子：</strong>使用筆刷時，按住左鍵拖曳可連續塗抹。地形與困難度也可選擇油漆桶，點擊填滿相同值的相連區域。</span>
               </li>
               <li className="flex items-start gap-2 rounded-lg bg-slate-50/70 border border-slate-100 px-3 py-2">
                 <span className="w-5 h-5 rounded-full bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center text-[10px] font-bold shrink-0">2</span>

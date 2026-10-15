@@ -30,6 +30,7 @@ export enum StyleVariant {
 
 export type Difficulty = 0 | 1 | 2 | 3 | 4 | 5;
 export type BrushLayer = "terrain" | "landmark" | "style" | "travelEvent" | "campTag" | "difficulty";
+export type PaintTool = "brush" | "bucket";
 
 export interface HexCell {
   q: number;

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { BrushLayer, Difficulty, TerrainType, LandmarkType, StyleVariant } from "../types";
+import { BrushLayer, Difficulty, PaintTool, TerrainType, LandmarkType, StyleVariant } from "../types";
 import { DIFFICULTIES, DIFFICULTY_COLORS } from "../difficulty";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "../constants";
 import { getTravelEventColor } from "../travelEventColors";
@@ -33,7 +33,8 @@ import {
   ArrowDown,
   ScrollText,
   Tag,
-  Gauge
+  Gauge,
+  PaintBucket
 } from "lucide-react";
 
 const DEFAULT_CAMP_TAG = "";
@@ -42,6 +43,8 @@ interface SidebarProps {
   // Painting Brush State
   activeLayer: BrushLayer;
   setActiveLayer: (layer: BrushLayer) => void;
+  paintTool: PaintTool;
+  setPaintTool: (tool: PaintTool) => void;
   selectedDifficulty: Difficulty;
   setSelectedDifficulty: (difficulty: Difficulty) => void;
 
@@ -153,6 +156,8 @@ const CollapsibleGroup: React.FC<CollapsibleGroupProps> = ({
 export const Sidebar: React.FC<SidebarProps> = ({
   activeLayer,
   setActiveLayer,
+  paintTool,
+  setPaintTool,
   selectedDifficulty,
   setSelectedDifficulty,
   selectedTerrain,
@@ -645,6 +650,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Paint Item Selector */}
         <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-100">
+          {(activeLayer === "terrain" || activeLayer === "difficulty") && (
+            <div id="paint-tool-selector" className="space-y-2 mb-4">
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="繪製工具">
+                {([
+                  { tool: "brush", label: "筆刷", Icon: PencilLine },
+                  { tool: "bucket", label: "油漆桶", Icon: PaintBucket },
+                ] as const).map(({ tool, label, Icon }) => (
+                  <button
+                    key={tool}
+                    id={`paint-tool-${tool}`}
+                    type="button"
+                    aria-pressed={paintTool === tool}
+                    onClick={() => setPaintTool(tool)}
+                    className={`flex items-center justify-center gap-2 p-2 rounded-lg border text-xs font-semibold transition-colors ${
+                      paintTool === tool
+                        ? "bg-indigo-50 text-indigo-700 border-indigo-500 ring-1 ring-indigo-400"
+                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {paintTool === "bucket"
+                  ? activeLayer === "terrain"
+                    ? "點擊格子，將六個方向相連的相同地形填滿為所選地形；也可填入無地形區域。"
+                    : "點擊有地形的格子，將六個方向相連、困難度相同的格子填滿為所選數值；無地形處會阻隔填滿。"
+                  : "點擊或按住左鍵拖曳，將所選屬性塗抹到格子上。"}
+              </p>
+            </div>
+          )}
+
           {activeLayer === "difficulty" && (
             <div id="difficulty-selector" className="space-y-3">
               <span className="text-xs font-bold text-slate-500 block">選擇困難度</span>
@@ -668,7 +707,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">點擊或拖曳有地形的格子以設定困難度。預設為 0，數字標記顏色越深代表困難度越高，格子底色保留地形資訊。</p>
+              <p className="text-xs text-slate-500 leading-relaxed">困難度預設為 0，數字標記顏色越深代表困難度越高，格子底色保留地形資訊。</p>
             </div>
           )}
 
