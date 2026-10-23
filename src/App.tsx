@@ -4,8 +4,10 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { BrushLayer, CampTagMap, Difficulty, HexCell, PaintTool, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
+import { BrushLayer, CampLink, CampLinkTool, CampTagMap, Difficulty, HexCell, PaintTool, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
 import { DEFAULT_DIFFICULTY, parseDifficulty } from "./difficulty";
+import { isLinkEndpoint, normalizeCampLinks } from "./campLinks";
+import { CampLinksOverlay } from "./components/CampLinksOverlay";
 import { fillRegion, paintTerrain } from "./mapPainting";
 import { Sidebar } from "./components/Sidebar";
 import { HexRenderer } from "./components/HexRenderer";
@@ -104,6 +106,7 @@ interface AtlasMap {
   cells: Record<string, HexCell>;
   travelEvents: TravelEventMap;
   campTags: CampTagMap;
+  campLinks: CampLink[];
 }
 
 interface HistorySnapshot {
@@ -111,6 +114,7 @@ interface HistorySnapshot {
   radius: number;
   travelEvents: TravelEventMap;
   campTags: CampTagMap;
+  campLinks: CampLink[];
 }
 
 const getNextMapId = (maps: AtlasMap[]) => {
@@ -207,6 +211,11 @@ export default function App() {
   const travelEventsRef = useRef<TravelEventMap>({});
   const [campTags, setCampTags] = useState<CampTagMap>({});
   const campTagsRef = useRef<CampTagMap>({});
+  const [campLinks, setCampLinks] = useState<CampLink[]>([]);
+  const campLinksRef = useRef<CampLink[]>([]);
+  const [linkStart, setLinkStart] = useState<string | null>(null);
+  const [campLinkTool, setCampLinkTool] = useState<CampLinkTool>("create");
+  const [linkHover, setLinkHover] = useState<string | null>(null);
   const [maps, setMaps] = useState<AtlasMap[]>(() => [
     {
       id: DEFAULT_MAP_ID,
@@ -215,6 +224,7 @@ export default function App() {
       cells: createNewMapCells(),
       travelEvents: {},
       campTags: {},
+      campLinks: [],
     },
   ]);
   const [selectedMapIndex, setSelectedMapIndex] = useState<number>(0);
@@ -386,21 +396,27 @@ export default function App() {
       cells: JSON.parse(JSON.stringify(cells)),
       travelEvents: JSON.parse(JSON.stringify(travelEvents)),
       campTags: JSON.parse(JSON.stringify(campTags)),
+      campLinks: JSON.parse(JSON.stringify(campLinks)),
     } : map);
-  }, [maps, selectedMapIndex, cells, radius, travelEvents, campTags]);
+  }, [maps, selectedMapIndex, cells, radius, travelEvents, campTags, campLinks]);
 
   const updateCurrentMapSnapshot = useCallback((
     nextCells: Record<string, HexCell>,
     nextRadius: number,
     nextTravelEvents: TravelEventMap = travelEventsRef.current,
-    nextCampTags: CampTagMap = campTagsRef.current
+    nextCampTags: CampTagMap = campTagsRef.current,
+    nextCampLinks: CampLink[] = campLinksRef.current
   ) => {
+    const validLinks = normalizeCampLinks(nextCampLinks, nextCells);
+    campLinksRef.current = validLinks;
+    setCampLinks(validLinks);
     setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
       ...map,
       radius: nextRadius,
       cells: JSON.parse(JSON.stringify(nextCells)),
       travelEvents: JSON.parse(JSON.stringify(nextTravelEvents)),
       campTags: JSON.parse(JSON.stringify(nextCampTags)),
+      campLinks: JSON.parse(JSON.stringify(validLinks)),
     } : map));
   }, [selectedMapIndex]);
 
@@ -408,20 +424,24 @@ export default function App() {
     nextCells: Record<string, HexCell>,
     nextRadius: number,
     nextTravelEvents: TravelEventMap,
-    nextCampTags: CampTagMap
+    nextCampTags: CampTagMap,
+    nextCampLinks: CampLink[]
   ) => {
+    setLinkStart(null);
+    setLinkHover(null);
     setHistory([{
       cells: JSON.parse(JSON.stringify(nextCells)),
       radius: nextRadius,
       travelEvents: JSON.parse(JSON.stringify(nextTravelEvents)),
       campTags: JSON.parse(JSON.stringify(nextCampTags)),
+      campLinks: JSON.parse(JSON.stringify(normalizeCampLinks(nextCampLinks, nextCells))),
     }]);
     setHistoryIndex(0);
   }, []);
 
   // Initialize History with current state
   useEffect(() => {
-    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS, travelEvents: {}, campTags: {} };
+    const initialState = { cells: createNewMapCells(), radius: DEFAULT_MAP_RADIUS, travelEvents: {}, campTags: {}, campLinks: [] };
     setHistory([initialState]);
     setHistoryIndex(0);
   }, []);
@@ -437,6 +457,7 @@ export default function App() {
       radius: newRadius,
       travelEvents: JSON.parse(JSON.stringify(newTravelEvents)),
       campTags: JSON.parse(JSON.stringify(newCampTags)),
+      campLinks: JSON.parse(JSON.stringify(normalizeCampLinks(campLinksRef.current, newCells))),
     };
     // Slice off any REDO redoable states
     const sliceHistory = history.slice(0, historyIndex + 1);
@@ -465,11 +486,13 @@ export default function App() {
     cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(targetMap.travelEvents));
     campTagsRef.current = JSON.parse(JSON.stringify(targetMap.campTags));
+    campLinksRef.current = JSON.parse(JSON.stringify(targetMap.campLinks));
+    setCampLinks(campLinksRef.current);
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
     setCampTags(campTagsRef.current);
     setRadius(targetMap.radius);
-    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents, targetMap.campTags);
+    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents, targetMap.campTags, targetMap.campLinks);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -483,6 +506,7 @@ export default function App() {
       cells: createNewMapCells(),
       travelEvents: {},
       campTags: {},
+      campLinks: [],
     };
 
     setMaps([...nextMaps, nextMap]);
@@ -490,11 +514,13 @@ export default function App() {
     cellsRef.current = JSON.parse(JSON.stringify(nextMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(nextMap.travelEvents));
     campTagsRef.current = JSON.parse(JSON.stringify(nextMap.campTags));
+    campLinksRef.current = JSON.parse(JSON.stringify(nextMap.campLinks));
+    setCampLinks(campLinksRef.current);
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
     setCampTags(campTagsRef.current);
     setRadius(nextMap.radius);
-    resetHistory(nextMap.cells, nextMap.radius, nextMap.travelEvents, nextMap.campTags);
+    resetHistory(nextMap.cells, nextMap.radius, nextMap.travelEvents, nextMap.campTags, nextMap.campLinks);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -509,6 +535,7 @@ export default function App() {
       cells: JSON.parse(JSON.stringify(sourceMap.cells)),
       travelEvents: JSON.parse(JSON.stringify(sourceMap.travelEvents)),
       campTags: JSON.parse(JSON.stringify(sourceMap.campTags)),
+      campLinks: JSON.parse(JSON.stringify(sourceMap.campLinks)),
     };
 
     setMaps([...nextMaps, duplicatedMap]);
@@ -516,11 +543,13 @@ export default function App() {
     cellsRef.current = JSON.parse(JSON.stringify(duplicatedMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(duplicatedMap.travelEvents));
     campTagsRef.current = JSON.parse(JSON.stringify(duplicatedMap.campTags));
+    campLinksRef.current = JSON.parse(JSON.stringify(duplicatedMap.campLinks));
+    setCampLinks(campLinksRef.current);
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
     setCampTags(campTagsRef.current);
     setRadius(duplicatedMap.radius);
-    resetHistory(duplicatedMap.cells, duplicatedMap.radius, duplicatedMap.travelEvents, duplicatedMap.campTags);
+    resetHistory(duplicatedMap.cells, duplicatedMap.radius, duplicatedMap.travelEvents, duplicatedMap.campTags, duplicatedMap.campLinks);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -539,11 +568,13 @@ export default function App() {
     cellsRef.current = JSON.parse(JSON.stringify(targetMap.cells));
     travelEventsRef.current = JSON.parse(JSON.stringify(targetMap.travelEvents));
     campTagsRef.current = JSON.parse(JSON.stringify(targetMap.campTags));
+    campLinksRef.current = JSON.parse(JSON.stringify(targetMap.campLinks));
+    setCampLinks(campLinksRef.current);
     setCells(cellsRef.current);
     setTravelEvents(travelEventsRef.current);
     setCampTags(campTagsRef.current);
     setRadius(targetMap.radius);
-    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents, targetMap.campTags);
+    resetHistory(targetMap.cells, targetMap.radius, targetMap.travelEvents, targetMap.campTags, targetMap.campLinks);
     setHoveredCellImperatively(null);
     resetCamera();
   };
@@ -590,11 +621,13 @@ export default function App() {
       cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
       travelEventsRef.current = JSON.parse(JSON.stringify(targetState.travelEvents));
       campTagsRef.current = JSON.parse(JSON.stringify(targetState.campTags));
+      campLinksRef.current = JSON.parse(JSON.stringify(targetState.campLinks));
+      setCampLinks(campLinksRef.current);
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
       setCampTags(campTagsRef.current);
       setRadius(targetState.radius);
-      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents, targetState.campTags);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents, targetState.campTags, targetState.campLinks);
       setHistoryIndex(prevIndex);
       setHoveredCellImperatively(null);
     }
@@ -608,11 +641,13 @@ export default function App() {
       cellsRef.current = JSON.parse(JSON.stringify(targetState.cells));
       travelEventsRef.current = JSON.parse(JSON.stringify(targetState.travelEvents));
       campTagsRef.current = JSON.parse(JSON.stringify(targetState.campTags));
+      campLinksRef.current = JSON.parse(JSON.stringify(targetState.campLinks));
+      setCampLinks(campLinksRef.current);
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
       setCampTags(campTagsRef.current);
       setRadius(targetState.radius);
-      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents, targetState.campTags);
+      updateCurrentMapSnapshot(targetState.cells, targetState.radius, targetState.travelEvents, targetState.campTags, targetState.campLinks);
       setHistoryIndex(nextIndex);
       setHoveredCellImperatively(null);
     }
@@ -792,9 +827,56 @@ export default function App() {
     setHoveredCellImperatively(result.cells[key]);
   };
 
+  useEffect(() => {
+    setLinkStart(null);
+    setLinkHover(null);
+  }, [activeLayer, campLinkTool, selectedMapIndex, historyIndex, maps.length]);
+
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLinkStart(null);
+        setLinkHover(null);
+      }
+    };
+    window.addEventListener("keydown", cancel);
+    return () => window.removeEventListener("keydown", cancel);
+  }, []);
+
+  const commitCampLinks = (nextLinks: CampLink[]) => {
+    updateCurrentMapSnapshot(cellsRef.current, radius, travelEventsRef.current, campTagsRef.current, nextLinks);
+    pushToHistory(cellsRef.current, radius, travelEventsRef.current, campTagsRef.current);
+    setLinkStart(null);
+    setLinkHover(null);
+  };
+
   // Canvas Drag/Pan
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
     const targetCell = getCellFromPointer(e.clientX, e.clientY);
+
+    if (activeLayer === "campLink" && e.button === 0) {
+      if (campLinkTool === "create" && isLinkEndpoint(targetCell ?? undefined)) {
+        const key = `${targetCell!.q},${targetCell!.r}`;
+        if (!linkStart) {
+          setLinkStart(key);
+          setLinkHover(key);
+        } else if (linkStart === key) {
+          setLinkStart(null);
+          setLinkHover(null);
+        } else if (!campLinksRef.current.some((link) => link.from === linkStart && link.to === key)) {
+          commitCampLinks([...campLinksRef.current, { from: linkStart, to: key }]);
+        } else {
+          setLinkStart(null);
+          setLinkHover(null);
+        }
+      }
+      e.preventDefault();
+      return;
+    }
+    if (activeLayer === "campLink" && e.button === 2) {
+      setLinkStart(null);
+      setLinkHover(null);
+    }
 
     if (e.button === 0 && targetCell) {
       if (isBucketActive) {
@@ -816,7 +898,7 @@ export default function App() {
       panStartRef.current = { x: e.clientX - panXRef.current, y: e.clientY - panYRef.current };
       e.preventDefault();
     }
-  }, [getCellFromPointer, paintCell, isBucketActive, fillCell, setHoveredCellImperatively]);
+  }, [getCellFromPointer, paintCell, isBucketActive, fillCell, setHoveredCellImperatively, activeLayer, campLinkTool, linkStart, commitCampLinks]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     if (isPanningRef.current) {
@@ -827,6 +909,9 @@ export default function App() {
     }
 
     const targetCell = getCellFromPointer(e.clientX, e.clientY);
+    if (activeLayer === "campLink" && campLinkTool === "create") {
+      setLinkHover(isLinkEndpoint(targetCell ?? undefined) ? `${targetCell!.q},${targetCell!.r}` : null);
+    }
     const currentCell = hoveredCellRef.current;
     if (targetCell?.q !== currentCell?.q || targetCell?.r !== currentCell?.r) {
       setHoveredCellImperatively(targetCell);
@@ -834,9 +919,10 @@ export default function App() {
     if (isMouseDownRef.current && targetCell) {
       paintCell(targetCell);
     }
-  }, [getCellFromPointer, paintCell, setHoveredCellImperatively, updateCameraTransform]);
+  }, [getCellFromPointer, paintCell, setHoveredCellImperatively, updateCameraTransform, activeLayer, campLinkTool]);
 
   const handleCanvasMouseLeave = useCallback(() => {
+    setLinkHover(null);
     setHoveredCellImperatively(null);
   }, [setHoveredCellImperatively]);
 
@@ -903,6 +989,7 @@ export default function App() {
           v: normalizeTileVariant(c.v),
           d: c.difficulty ?? DEFAULT_DIFFICULTY,
         })),
+        campLinks: normalizeCampLinks(map.campLinks, map.cells),
         campTags: exportCells
           .filter((c) => campLandmarks.has(c.landmark))
           .map((c) => {
@@ -1008,13 +1095,16 @@ export default function App() {
         ? data.radius
         : inferredRadius;
 
+    const nextCells = { ...createNoTerrainCells(nextRadius), ...incomingCells };
+
     return {
       id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallbackId,
       level: Number.isSafeInteger(data.level) && data.level >= 0 ? data.level : 0,
       radius: nextRadius,
-      cells: { ...createNoTerrainCells(nextRadius), ...incomingCells },
+      cells: nextCells,
       travelEvents: nextTravelEvents,
       campTags: nextCampTags,
+      campLinks: normalizeCampLinks(data.world?.campLinks ?? data.campLinks, nextCells),
     };
   };
 
@@ -1085,10 +1175,12 @@ export default function App() {
       cellsRef.current = JSON.parse(JSON.stringify(firstMap.cells));
       travelEventsRef.current = JSON.parse(JSON.stringify(firstMap.travelEvents));
       campTagsRef.current = JSON.parse(JSON.stringify(firstMap.campTags));
+      campLinksRef.current = JSON.parse(JSON.stringify(firstMap.campLinks));
+      setCampLinks(campLinksRef.current);
       setCells(cellsRef.current);
       setTravelEvents(travelEventsRef.current);
       setCampTags(campTagsRef.current);
-      resetHistory(firstMap.cells, firstMap.radius, firstMap.travelEvents, firstMap.campTags);
+      resetHistory(firstMap.cells, firstMap.radius, firstMap.travelEvents, firstMap.campTags, firstMap.campLinks);
       setLoadedTravelEventBrushes((prev) => ({
         eventIds: importedTravelEventIds,
         version: prev.version + 1,
@@ -1115,6 +1207,11 @@ export default function App() {
         setActiveLayer={setActiveLayer}
         paintTool={paintTool}
         setPaintTool={setPaintTool}
+        campLinkTool={campLinkTool}
+        setCampLinkTool={setCampLinkTool}
+        onClearCampLinks={() => {
+          if (campLinksRef.current.length > 0) commitCampLinks([]);
+        }}
         selectedDifficulty={selectedDifficulty}
         setSelectedDifficulty={setSelectedDifficulty}
         selectedTerrain={selectedTerrain}
@@ -1361,6 +1458,19 @@ export default function App() {
                 );
               })}
 
+              {activeLayer === "campLink" && (
+                <CampLinksOverlay
+                  cells={cells}
+                  links={campLinks}
+                  canRemove={campLinkTool === "remove"}
+                  size={cellSize}
+                  start={linkStart}
+                  hover={linkHover}
+                  onDelete={(link) => commitCampLinks(campLinksRef.current.filter((item) =>
+                    item.from !== link.from || item.to !== link.to))}
+                />
+              )}
+
               <polygon
                 ref={hoverOverlayRef}
                 fill="none"
@@ -1370,7 +1480,7 @@ export default function App() {
                 style={{ display: "none", pointerEvents: "none" }}
               />
 
-              <g id="origin-flag" filter="drop-shadow(0px 2px 3px rgba(0,0,0,0.35))" style={{ pointerEvents: "none", display: activeLayer === "difficulty" ? "none" : undefined }}>
+              <g id="origin-flag" filter="drop-shadow(0px 2px 3px rgba(0,0,0,0.35))" style={{ pointerEvents: "none", display: activeLayer === "difficulty" || activeLayer === "campLink" ? "none" : undefined }}>
                 <line
                   x1="0"
                   y1={cellSize * 0.38}

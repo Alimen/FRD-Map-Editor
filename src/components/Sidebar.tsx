@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { BrushLayer, Difficulty, PaintTool, TerrainType, LandmarkType, StyleVariant } from "../types";
+import { BrushLayer, CampLinkTool, Difficulty, PaintTool, TerrainType, LandmarkType, StyleVariant } from "../types";
 import { DIFFICULTIES, DIFFICULTY_COLORS } from "../difficulty";
 import { TERRAIN_CONFIGS, LANDMARK_CONFIGS, STYLE_CONFIGS } from "../constants";
 import { getTravelEventColor } from "../travelEventColors";
@@ -31,6 +31,7 @@ import {
   Map,
   ArrowUp,
   ArrowDown,
+  ArrowUpRight,
   ScrollText,
   Tag,
   Gauge,
@@ -45,6 +46,9 @@ interface SidebarProps {
   setActiveLayer: (layer: BrushLayer) => void;
   paintTool: PaintTool;
   setPaintTool: (tool: PaintTool) => void;
+  campLinkTool: CampLinkTool;
+  setCampLinkTool: (tool: CampLinkTool) => void;
+  onClearCampLinks: () => void;
   selectedDifficulty: Difficulty;
   setSelectedDifficulty: (difficulty: Difficulty) => void;
 
@@ -158,6 +162,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveLayer,
   paintTool,
   setPaintTool,
+  campLinkTool,
+  setCampLinkTool,
+  onClearCampLinks,
   selectedDifficulty,
   setSelectedDifficulty,
   selectedTerrain,
@@ -435,11 +442,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 id="atlas-move-map-up-btn"
                 onClick={() => onMoveMap(-1)}
                 disabled={selectedMapIndex <= 0}
-                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  selectedMapIndex > 0
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${selectedMapIndex > 0
                     ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
                     : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 <ArrowUp className="w-3.5 h-3.5" />
                 <span>往前</span>
@@ -448,11 +454,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 id="atlas-move-map-down-btn"
                 onClick={() => onMoveMap(1)}
                 disabled={selectedMapIndex >= maps.length - 1}
-                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  selectedMapIndex < maps.length - 1
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${selectedMapIndex < maps.length - 1
                     ? "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
                     : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 <ArrowDown className="w-3.5 h-3.5" />
                 <span>往後</span>
@@ -480,11 +485,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 id="atlas-delete-map-btn"
                 onClick={onDeleteMap}
                 disabled={maps.length <= 1}
-                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${
-                  maps.length > 1
+                className={`flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold border transition-colors ${maps.length > 1
                     ? "bg-rose-50 hover:bg-rose-100 text-rose-600 border-rose-100"
                     : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>刪除</span>
@@ -576,11 +580,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="layer-btn-terrain"
                 onClick={() => setActiveLayer("terrain")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "terrain"
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "terrain"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Grid className="w-4 h-4" />
                 <span>地形</span>
@@ -588,11 +591,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="layer-btn-landmark"
                 onClick={() => setActiveLayer("landmark")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "landmark"
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "landmark"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <MapPin className="w-4 h-4" />
                 <span>地標</span>
@@ -600,11 +602,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="layer-btn-style"
                 onClick={() => setActiveLayer("style")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "style"
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "style"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Sparkles className="w-4 h-4" />
                 <span>風格</span>
@@ -612,11 +613,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="layer-btn-travel-event"
                 onClick={() => setActiveLayer("travelEvent")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "travelEvent"
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "travelEvent"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <ScrollText className="w-4 h-4" />
                 <span>事件</span>
@@ -624,11 +624,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="layer-btn-camp-tag"
                 onClick={() => setActiveLayer("campTag")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "campTag"
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "campTag"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Tag className="w-4 h-4" />
                 <span>標籤</span>
@@ -636,331 +635,364 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 id="layer-btn-difficulty"
                 onClick={() => setActiveLayer("difficulty")}
-                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${
-                  activeLayer === "difficulty"
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "difficulty"
                     ? "bg-white text-indigo-600 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Gauge className="w-4 h-4" />
                 <span>困難度</span>
               </button>
+              <button
+                id="layer-btn-camp-link"
+                onClick={() => setActiveLayer("campLink")}
+                className={`py-2 px-1 text-xs font-semibold rounded-lg transition-all flex flex-col items-center gap-1 ${activeLayer === "campLink"
+                    ? "bg-white text-indigo-600 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                  }`}
+              >
+                <ArrowUpRight className="w-4 h-4" />
+                <span>營地關聯</span>
+              </button>
             </div>
           </div>
 
-        {/* Paint Item Selector */}
-        <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-100">
-          {(activeLayer === "terrain" || activeLayer === "difficulty") && (
-            <div id="paint-tool-selector" className="space-y-2 mb-4">
-              <div className="grid grid-cols-2 gap-2" role="group" aria-label="繪製工具">
-                {([
-                  { tool: "brush", label: "筆刷", Icon: PencilLine },
-                  { tool: "bucket", label: "油漆桶", Icon: PaintBucket },
-                ] as const).map(({ tool, label, Icon }) => (
-                  <button
-                    key={tool}
-                    id={`paint-tool-${tool}`}
-                    type="button"
-                    aria-pressed={paintTool === tool}
-                    onClick={() => setPaintTool(tool)}
-                    className={`flex items-center justify-center gap-2 p-2 rounded-lg border text-xs font-semibold transition-colors ${
-                      paintTool === tool
-                        ? "bg-indigo-50 text-indigo-700 border-indigo-500 ring-1 ring-indigo-400"
-                        : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {label}
+          {/* Paint Item Selector */}
+          <div className="bg-slate-50/60 p-4 rounded-xl border border-slate-100">
+            {activeLayer === "campLink" && (
+              <div id="camp-link-instructions" className="space-y-2 text-xs text-slate-600 leading-relaxed">
+                <div className="grid grid-cols-3 gap-2" role="group" aria-label="箭頭筆刷">
+                  {([
+                    { tool: "create", label: "建立", Icon: ArrowUpRight },
+                    { tool: "remove", label: "移除", Icon: Minus },
+                  ] as const).map(({ tool, label, Icon }) => (
+                    <button key={tool} id={`camp-link-tool-${tool}`} type="button"
+                      aria-pressed={campLinkTool === tool} onClick={() => setCampLinkTool(tool)}
+                      className={`flex items-center justify-center gap-1 px-1 py-2 whitespace-nowrap rounded-lg border text-xs font-semibold transition-colors ${campLinkTool === tool
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-500 ring-1 ring-indigo-400"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                        }`}>
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  ))}
+                  <button id="camp-link-clear-all" type="button" onClick={onClearCampLinks}
+                    title="清除目前地圖的所有箭頭，可透過復原還原"
+                    className="flex items-center justify-center gap-1 px-1 py-2 whitespace-nowrap rounded-lg border text-xs font-semibold transition-colors bg-white text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300">
+                    <Trash2 className="w-4 h-4" />
+                    全部清除
                   </button>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                {paintTool === "bucket"
-                  ? activeLayer === "terrain"
-                    ? "點擊格子，將六個方向相連的相同地形填滿為所選地形；也可填入無地形區域。"
-                    : "點擊有地形的格子，將六個方向相連、困難度相同的格子填滿為所選數值；無地形處會阻隔填滿。"
-                  : "點擊或按住左鍵拖曳，將所選屬性塗抹到格子上。"}
-              </p>
-            </div>
-          )}
-
-          {activeLayer === "difficulty" && (
-            <div id="difficulty-selector" className="space-y-3">
-              <span className="text-xs font-bold text-slate-500 block">選擇困難度</span>
-              <div className="grid grid-cols-3 gap-2">
-                {DIFFICULTIES.map((difficulty) => (
-                  <button
-                    key={difficulty}
-                    id={`difficulty-brush-${difficulty}`}
-                    type="button"
-                    aria-label={`困難度 ${difficulty}`}
-                    aria-pressed={selectedDifficulty === difficulty}
-                    onClick={() => setSelectedDifficulty(difficulty)}
-                    className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${
-                      selectedDifficulty === difficulty
-                        ? "bg-white border-indigo-500 shadow-sm ring-1 ring-indigo-400"
-                        : "bg-white/80 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    <span className="w-3.5 h-3.5 rounded border border-black/10" style={{ backgroundColor: DIFFICULTY_COLORS[difficulty] }} />
-                    <span className="text-sm font-bold font-mono text-slate-700">{difficulty}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 leading-relaxed">困難度預設為 0，數字標記顏色越深代表困難度越高，格子底色保留地形資訊。</p>
-            </div>
-          )}
-
-          {activeLayer === "terrain" && (
-            <div id="terrain-selector" className="space-y-3">
-              <span className="text-xs font-bold text-slate-500 block mb-2">選擇地形種類</span>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.values(TERRAIN_CONFIGS).map((cfg) => (
-                  <button
-                    key={cfg.type}
-                    onClick={() => setSelectedTerrain(cfg.type)}
-                    className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 ${
-                      selectedTerrain === cfg.type
-                        ? "bg-white border-indigo-500 border-2 shadow-sm font-semibold ring-1 ring-indigo-400"
-                        : "bg-white/80 border-slate-200/80 hover:border-slate-300"
-                    }`}
-                  >
-                    <div
-                      className="w-5 h-5 rounded border shadow-inner shrink-0"
-                      style={{ backgroundColor: cfg.color, borderColor: cfg.borderColor }}
-                    />
-                    <div className="text-xs text-slate-700">{cfg.label}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeLayer === "landmark" && (
-            <div id="landmark-selector" className="space-y-2">
-              <span className="text-xs font-bold text-slate-500 block mb-2">放置地標建築</span>
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {Object.values(LANDMARK_CONFIGS).map((cfg) => (
-                  <button
-                    key={cfg.type}
-                    onClick={() => setSelectedLandmark(cfg.type)}
-                    className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
-                      selectedLandmark === cfg.type
-                        ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
-                        : "bg-white/80 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[9px] font-mono font-bold text-slate-600">
-                        {cfg.label[0]}
-                      </div>
-                      <span className="text-xs font-medium text-slate-700">
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeLayer === "style" && (
-            <div id="style-selector" className="space-y-3">
-              <span className="text-xs font-bold text-slate-500 block mb-2">指定風格變體</span>
-              <div className="space-y-1.5">
-                {Object.values(STYLE_CONFIGS).map((cfg) => (
-                  <button
-                    key={cfg.type}
-                    onClick={() => setSelectedStyle(cfg.type)}
-                    className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
-                      selectedStyle === cfg.type
-                        ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
-                        : "bg-white/80 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3.5 h-3.5 rounded-full"
-                        style={{ backgroundColor: cfg.borderColor }}
-                      />
-                      <span className={`text-xs font-medium ${cfg.textColor}`}>
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeLayer === "travelEvent" && (
-            <div id="travel-event-selector" className="space-y-3">
-              <span className="text-xs font-bold text-slate-500 block mb-2">指定旅行事件</span>
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                <button
-                  id="travel-event-none-btn"
-                  onClick={() => setSelectedTravelEvent("")}
-                  className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${
-                    selectedTravelEvent.trim() === ""
-                      ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
-                      : "bg-white/80 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" />
-                    <span className="text-xs font-medium text-slate-700">
-                      清除事件
-                    </span>
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                </button>
-
-                {travelEventBrushes.map((eventId) => {
-                  const eventColor = getTravelEventColor(eventId);
-
-                  return (
-                    <div
-                      key={eventId}
-                      className={`w-full rounded-lg border transition-all flex items-stretch overflow-hidden ${
-                        selectedTravelEvent === eventId
-                          ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
-                          : "bg-white/80 border-slate-200 hover:border-slate-300"
-                      }`}
-                    >
-                      <button
-                        onClick={() => setSelectedTravelEvent(eventId)}
-                        className="flex-1 min-w-0 p-2 px-3 text-left flex items-center justify-between gap-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div
-                            className="w-3.5 h-3.5 rounded-full border shrink-0"
-                            style={{
-                              backgroundColor: eventColor.fill,
-                              borderColor: eventColor.stroke,
-                            }}
-                          />
-                          <span className="text-xs font-medium text-slate-700 font-mono truncate">
-                            {eventId}
-                          </span>
-                        </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      </button>
-                      <button
-                        onClick={() => handleRemoveTravelEventBrush(eventId)}
-                        className="w-9 shrink-0 border-l border-slate-200/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
-                        title="移除事件筆刷"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <form onSubmit={handleAddTravelEventBrush} className="flex gap-2 items-center">
-                <div className="relative flex-1 min-w-0">
-                  <ScrollText className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="travel-event-input"
-                    type="text"
-                    value={newTravelEventInput}
-                    onChange={(e) => setNewTravelEventInput(e.target.value)}
-                    placeholder="encounter_1001"
-                    className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
                 </div>
-                <button
-                  id="travel-event-add-btn"
-                  type="submit"
-                  className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"
-                  title="新增旅行事件筆刷"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
-          )}
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {campLinkTool === "create"
+                    ? "先點起點格，再點終點格，建立有向箭頭。按 Esc、右鍵或再次點擊起點可取消繪製。"
+                    : "左鍵點擊箭頭以移除該連線，可透過復原還原。"}
+                </p>
+              </div>
+            )}
+            {(activeLayer === "terrain" || activeLayer === "difficulty") && (
+              <div id="paint-tool-selector" className="space-y-2 mb-4">
+                <div className="grid grid-cols-2 gap-2" role="group" aria-label="繪製工具">
+                  {([
+                    { tool: "brush", label: "筆刷", Icon: PencilLine },
+                    { tool: "bucket", label: "油漆桶", Icon: PaintBucket },
+                  ] as const).map(({ tool, label, Icon }) => (
+                    <button
+                      key={tool}
+                      id={`paint-tool-${tool}`}
+                      type="button"
+                      aria-pressed={paintTool === tool}
+                      onClick={() => setPaintTool(tool)}
+                      className={`flex items-center justify-center gap-2 p-2 rounded-lg border text-xs font-semibold transition-colors ${paintTool === tool
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-500 ring-1 ring-indigo-400"
+                          : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+                        }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {paintTool === "bucket"
+                    ? activeLayer === "terrain"
+                      ? "點擊格子，將六個方向相連的相同地形填滿為所選地形；也可填入無地形區域。"
+                      : "點擊有地形的格子，將六個方向相連、困難度相同的格子填滿為所選數值；無地形處會阻隔填滿。"
+                    : "點擊或按住左鍵拖曳，將所選屬性塗抹到格子上。"}
+                </p>
+              </div>
+            )}
 
-          {activeLayer === "campTag" && (
-            <div id="camp-tag-selector" className="space-y-3">
-              <span className="text-xs font-bold text-slate-500 block mb-2">指定營地標籤</span>
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {campTagBrushes.map((tag) => {
-                  const tagColor = tag === DEFAULT_CAMP_TAG
-                    ? { fill: "#e2e8f0", stroke: "#94a3b8" }
-                    : getTravelEventColor(tag);
+            {activeLayer === "difficulty" && (
+              <div id="difficulty-selector" className="space-y-3">
+                <span className="text-xs font-bold text-slate-500 block">選擇困難度</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {DIFFICULTIES.map((difficulty) => (
+                    <button
+                      key={difficulty}
+                      id={`difficulty-brush-${difficulty}`}
+                      type="button"
+                      aria-label={`困難度 ${difficulty}`}
+                      aria-pressed={selectedDifficulty === difficulty}
+                      onClick={() => setSelectedDifficulty(difficulty)}
+                      className={`flex items-center justify-center gap-2 p-3 rounded-lg border transition-all ${selectedDifficulty === difficulty
+                          ? "bg-white border-indigo-500 shadow-sm ring-1 ring-indigo-400"
+                          : "bg-white/80 border-slate-200 hover:border-slate-300"
+                        }`}
+                    >
+                      <span className="w-3.5 h-3.5 rounded border border-black/10" style={{ backgroundColor: DIFFICULTY_COLORS[difficulty] }} />
+                      <span className="text-sm font-bold font-mono text-slate-700">{difficulty}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">困難度預設為 0，數字標記顏色越深代表困難度越高，格子底色保留地形資訊。</p>
+              </div>
+            )}
 
-                  return (
-                    <div
-                      key={tag}
-                      className={`w-full rounded-lg border transition-all flex items-stretch overflow-hidden ${
-                        selectedCampTag === tag
+            {activeLayer === "terrain" && (
+              <div id="terrain-selector" className="space-y-3">
+                <span className="text-xs font-bold text-slate-500 block mb-2">選擇地形種類</span>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.values(TERRAIN_CONFIGS).map((cfg) => (
+                    <button
+                      key={cfg.type}
+                      onClick={() => setSelectedTerrain(cfg.type)}
+                      className={`p-2.5 rounded-lg border text-left transition-all flex items-center gap-2.5 ${selectedTerrain === cfg.type
+                          ? "bg-white border-indigo-500 border-2 shadow-sm font-semibold ring-1 ring-indigo-400"
+                          : "bg-white/80 border-slate-200/80 hover:border-slate-300"
+                        }`}
+                    >
+                      <div
+                        className="w-5 h-5 rounded border shadow-inner shrink-0"
+                        style={{ backgroundColor: cfg.color, borderColor: cfg.borderColor }}
+                      />
+                      <div className="text-xs text-slate-700">{cfg.label}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeLayer === "landmark" && (
+              <div id="landmark-selector" className="space-y-2">
+                <span className="text-xs font-bold text-slate-500 block mb-2">放置地標建築</span>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {Object.values(LANDMARK_CONFIGS).map((cfg) => (
+                    <button
+                      key={cfg.type}
+                      onClick={() => setSelectedLandmark(cfg.type)}
+                      className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${selectedLandmark === cfg.type
                           ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
                           : "bg-white/80 border-slate-200 hover:border-slate-300"
-                      }`}
+                        }`}
                     >
-                      <button
-                        onClick={() => setSelectedCampTag(tag)}
-                        className="flex-1 min-w-0 p-2 px-3 text-left flex items-center justify-between gap-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div
-                            className="w-3.5 h-3.5 rounded-full border shrink-0"
-                            style={{
-                              backgroundColor: tagColor.fill,
-                              borderColor: tagColor.stroke,
-                            }}
-                          />
-                          <span className="text-xs font-medium text-slate-700 font-mono truncate">
-                            {tag === DEFAULT_CAMP_TAG ? "清除標籤" : tag}
-                          </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-[9px] font-mono font-bold text-slate-600">
+                          {cfg.label[0]}
                         </div>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      </button>
-                      {tag !== DEFAULT_CAMP_TAG && (
+                        <span className="text-xs font-medium text-slate-700">
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeLayer === "style" && (
+              <div id="style-selector" className="space-y-3">
+                <span className="text-xs font-bold text-slate-500 block mb-2">指定風格變體</span>
+                <div className="space-y-1.5">
+                  {Object.values(STYLE_CONFIGS).map((cfg) => (
+                    <button
+                      key={cfg.type}
+                      onClick={() => setSelectedStyle(cfg.type)}
+                      className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${selectedStyle === cfg.type
+                          ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                          : "bg-white/80 border-slate-200 hover:border-slate-300"
+                        }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3.5 h-3.5 rounded-full"
+                          style={{ backgroundColor: cfg.borderColor }}
+                        />
+                        <span className={`text-xs font-medium ${cfg.textColor}`}>
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {activeLayer === "travelEvent" && (
+              <div id="travel-event-selector" className="space-y-3">
+                <span className="text-xs font-bold text-slate-500 block mb-2">指定旅行事件</span>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  <button
+                    id="travel-event-none-btn"
+                    onClick={() => setSelectedTravelEvent("")}
+                    className={`w-full p-2 px-3 rounded-lg border text-left transition-all flex items-center justify-between ${selectedTravelEvent.trim() === ""
+                        ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                        : "bg-white/80 border-slate-200 hover:border-slate-300"
+                      }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-3.5 h-3.5 rounded-full bg-slate-200 border border-slate-300 shrink-0" />
+                      <span className="text-xs font-medium text-slate-700">
+                        清除事件
+                      </span>
+                    </div>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  </button>
+
+                  {travelEventBrushes.map((eventId) => {
+                    const eventColor = getTravelEventColor(eventId);
+
+                    return (
+                      <div
+                        key={eventId}
+                        className={`w-full rounded-lg border transition-all flex items-stretch overflow-hidden ${selectedTravelEvent === eventId
+                            ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                            : "bg-white/80 border-slate-200 hover:border-slate-300"
+                          }`}
+                      >
                         <button
-                          onClick={() => handleRemoveCampTagBrush(tag)}
+                          onClick={() => setSelectedTravelEvent(eventId)}
+                          className="flex-1 min-w-0 p-2 px-3 text-left flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-3.5 h-3.5 rounded-full border shrink-0"
+                              style={{
+                                backgroundColor: eventColor.fill,
+                                borderColor: eventColor.stroke,
+                              }}
+                            />
+                            <span className="text-xs font-medium text-slate-700 font-mono truncate">
+                              {eventId}
+                            </span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveTravelEventBrush(eventId)}
                           className="w-9 shrink-0 border-l border-slate-200/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
-                          title="移除營地標籤筆刷"
+                          title="移除事件筆刷"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <form onSubmit={handleAddCampTagBrush} className="flex gap-2 items-center">
-                <div className="relative flex-1 min-w-0">
-                  <Tag className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="camp-tag-input"
-                    type="text"
-                    value={newCampTagInput}
-                    onChange={(e) => setNewCampTagInput(e.target.value)}
-                    placeholder="tag1"
-                    className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  />
+                      </div>
+                    );
+                  })}
                 </div>
-                <button
-                  id="camp-tag-add-btn"
-                  type="submit"
-                  className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"
-                  title="新增營地標籤筆刷"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </form>
-              <div className="text-[10px] text-slate-400 leading-relaxed">
-                * 此筆刷只會套用在大營地或小營地。
-              </div>
-            </div>
-          )}
 
-        </div>
+                <form onSubmit={handleAddTravelEventBrush} className="flex gap-2 items-center">
+                  <div className="relative flex-1 min-w-0">
+                    <ScrollText className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="travel-event-input"
+                      type="text"
+                      value={newTravelEventInput}
+                      onChange={(e) => setNewTravelEventInput(e.target.value)}
+                      placeholder="encounter_1001"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <button
+                    id="travel-event-add-btn"
+                    type="submit"
+                    className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"
+                    title="新增旅行事件筆刷"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {activeLayer === "campTag" && (
+              <div id="camp-tag-selector" className="space-y-3">
+                <span className="text-xs font-bold text-slate-500 block mb-2">指定營地標籤</span>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {campTagBrushes.map((tag) => {
+                    const tagColor = tag === DEFAULT_CAMP_TAG
+                      ? { fill: "#e2e8f0", stroke: "#94a3b8" }
+                      : getTravelEventColor(tag);
+
+                    return (
+                      <div
+                        key={tag}
+                        className={`w-full rounded-lg border transition-all flex items-stretch overflow-hidden ${selectedCampTag === tag
+                            ? "bg-white border-indigo-500 border-2 shadow-sm ring-1 ring-indigo-400 font-medium"
+                            : "bg-white/80 border-slate-200 hover:border-slate-300"
+                          }`}
+                      >
+                        <button
+                          onClick={() => setSelectedCampTag(tag)}
+                          className="flex-1 min-w-0 p-2 px-3 text-left flex items-center justify-between gap-2"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div
+                              className="w-3.5 h-3.5 rounded-full border shrink-0"
+                              style={{
+                                backgroundColor: tagColor.fill,
+                                borderColor: tagColor.stroke,
+                              }}
+                            />
+                            <span className="text-xs font-medium text-slate-700 font-mono truncate">
+                              {tag === DEFAULT_CAMP_TAG ? "清除標籤" : tag}
+                            </span>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        </button>
+                        {tag !== DEFAULT_CAMP_TAG && (
+                          <button
+                            onClick={() => handleRemoveCampTagBrush(tag)}
+                            className="w-9 shrink-0 border-l border-slate-200/80 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex items-center justify-center"
+                            title="移除營地標籤筆刷"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <form onSubmit={handleAddCampTagBrush} className="flex gap-2 items-center">
+                  <div className="relative flex-1 min-w-0">
+                    <Tag className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="camp-tag-input"
+                      type="text"
+                      value={newCampTagInput}
+                      onChange={(e) => setNewCampTagInput(e.target.value)}
+                      placeholder="tag1"
+                      className="w-full pl-8 pr-3 py-2 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <button
+                    id="camp-tag-add-btn"
+                    type="submit"
+                    className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition-colors"
+                    title="新增營地標籤筆刷"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </form>
+                <div className="text-[10px] text-slate-400 leading-relaxed">
+                  * 此筆刷只會套用在大營地或小營地。
+                </div>
+              </div>
+            )}
+
+          </div>
         </CollapsibleGroup>
 
         {/* History Controls */}
@@ -975,11 +1007,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               id="undo-btn"
               onClick={undo}
               disabled={!canUndo}
-              className={`flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg font-medium text-xs border transition-all ${
-                canUndo
+              className={`flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg font-medium text-xs border transition-all ${canUndo
                   ? "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                   : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
-              }`}
+                }`}
             >
               <Undo2 className="w-3.5 h-3.5" />
               <span>復原 (Undo)</span>
@@ -988,11 +1019,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               id="redo-btn"
               onClick={redo}
               disabled={!canRedo}
-              className={`flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg font-medium text-xs border transition-all ${
-                canRedo
+              className={`flex items-center justify-center gap-1.5 py-2 px-4 rounded-lg font-medium text-xs border transition-all ${canRedo
                   ? "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                   : "bg-slate-100/50 text-slate-300 border-slate-200/40 cursor-not-allowed"
-              }`}
+                }`}
             >
               <Redo2 className="w-3.5 h-3.5" />
               <span>重做 (Redo)</span>
@@ -1037,71 +1067,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
           expanded={expandedGroups.json}
           onToggle={() => toggleGroup("json")}
         >
-        <div className="space-y-3">
-          {/* Drag & Drop Import zone */}
-          <div
-            id="json-dropzone"
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`cursor-pointer border border-dashed rounded-xl p-4 text-center transition-all ${
-              dragActive
-                ? "border-indigo-500 bg-indigo-50/40"
-                : "border-slate-200 bg-slate-50/30 hover:bg-slate-50"
-            }`}
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".json"
-              className="hidden"
-            />
-            <Upload className="w-5 h-5 text-slate-400 mx-auto mb-2 animate-bounce" />
-            <span className="text-xs font-medium text-slate-600 block">
-              拖入地圖 JSON 檔案
-            </span>
-            <span className="text-[10px] text-slate-400 block mt-1">
-              或點擊此處瀏覽載入
-            </span>
-          </div>
-
-          {jsonError && (
-            <div className="text-[10px] text-rose-500 font-medium bg-rose-50 p-2 rounded-lg border border-rose-100">
-              {jsonError}
+          <div className="space-y-3">
+            {/* Drag & Drop Import zone */}
+            <div
+              id="json-dropzone"
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`cursor-pointer border border-dashed rounded-xl p-4 text-center transition-all ${dragActive
+                  ? "border-indigo-500 bg-indigo-50/40"
+                  : "border-slate-200 bg-slate-50/30 hover:bg-slate-50"
+                }`}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".json"
+                className="hidden"
+              />
+              <Upload className="w-5 h-5 text-slate-400 mx-auto mb-2 animate-bounce" />
+              <span className="text-xs font-medium text-slate-600 block">
+                拖入地圖 JSON 檔案
+              </span>
+              <span className="text-[10px] text-slate-400 block mt-1">
+                或點擊此處瀏覽載入
+              </span>
             </div>
-          )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              id="export-btn"
-              onClick={exportJSON}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100 transition-colors"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>匯出 JSON 檔</span>
-            </button>
-            <button
-              id="copy-json-btn"
-              onClick={copyToClipboard}
-              className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition-colors"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700">已複製 JSON</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>複製 JSON 文字</span>
-                </>
-              )}
-            </button>
+            {jsonError && (
+              <div className="text-[10px] text-rose-500 font-medium bg-rose-50 p-2 rounded-lg border border-rose-100">
+                {jsonError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                id="export-btn"
+                onClick={exportJSON}
+                className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-semibold border border-indigo-100 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>匯出 JSON 檔</span>
+              </button>
+              <button
+                id="copy-json-btn"
+                onClick={copyToClipboard}
+                className="flex items-center justify-center gap-1.5 py-1.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition-colors"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700">已複製 JSON</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>複製 JSON 文字</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
         </CollapsibleGroup>
 
       </div>
