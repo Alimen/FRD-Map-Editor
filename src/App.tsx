@@ -102,6 +102,7 @@ const DEFAULT_CAMP_TAG = "";
 interface AtlasMap {
   id: string;
   level: number;
+  refTravelDays: number;
   radius: number;
   cells: Record<string, HexCell>;
   travelEvents: TravelEventMap;
@@ -220,6 +221,7 @@ export default function App() {
     {
       id: DEFAULT_MAP_ID,
       level: 0,
+      refTravelDays: 0,
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
       travelEvents: {},
@@ -502,6 +504,7 @@ export default function App() {
     const nextMap: AtlasMap = {
       id: getNextMapId(nextMaps),
       level: 0,
+      refTravelDays: 0,
       radius: DEFAULT_MAP_RADIUS,
       cells: createNewMapCells(),
       travelEvents: {},
@@ -531,6 +534,7 @@ export default function App() {
     const duplicatedMap: AtlasMap = {
       id: getNextMapId(nextMaps),
       level: sourceMap.level,
+      refTravelDays: sourceMap.refTravelDays,
       radius: sourceMap.radius,
       cells: JSON.parse(JSON.stringify(sourceMap.cells)),
       travelEvents: JSON.parse(JSON.stringify(sourceMap.travelEvents)),
@@ -584,6 +588,17 @@ export default function App() {
     setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
       ...map,
       id: sanitizedId || map.id,
+    } : map));
+  };
+
+  const handleChangeRefTravelDays = (refTravelDays: number) => {
+    if (!Number.isFinite(refTravelDays) || refTravelDays < 0) {
+      return;
+    }
+
+    setMaps((prevMaps) => prevMaps.map((map, index) => index === selectedMapIndex ? {
+      ...map,
+      refTravelDays,
     } : map));
   };
 
@@ -979,6 +994,7 @@ export default function App() {
     return {
       id: map.id,
       level: map.level,
+      refTravelDays: map.refTravelDays,
       world: {
         radius: map.radius,
         tiles: exportCells.map((c) => ({
@@ -1100,6 +1116,9 @@ export default function App() {
     return {
       id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallbackId,
       level: Number.isSafeInteger(data.level) && data.level >= 0 ? data.level : 0,
+      refTravelDays: typeof data.refTravelDays === "number" && Number.isFinite(data.refTravelDays) && data.refTravelDays >= 0
+        ? data.refTravelDays
+        : 0,
       radius: nextRadius,
       cells: nextCells,
       travelEvents: nextTravelEvents,
@@ -1243,6 +1262,8 @@ export default function App() {
         onMoveMap={handleMoveMap}
         mapLevel={maps[selectedMapIndex].level}
         onChangeMapLevel={handleChangeMapLevel}
+        refTravelDays={maps[selectedMapIndex].refTravelDays}
+        onChangeRefTravelDays={handleChangeRefTravelDays}
         exportJSON={handleExportJSON}
         importJSON={handleImportJSON}
         terrainCounts={terrainCounts}

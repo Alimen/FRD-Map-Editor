@@ -96,6 +96,8 @@ interface SidebarProps {
   onMoveMap: (direction: -1 | 1) => void;
   mapLevel: number;
   onChangeMapLevel: (level: number) => void;
+  refTravelDays: number;
+  onChangeRefTravelDays: (days: number) => void;
 
   // JSON Operations
   exportJSON: () => void;
@@ -104,7 +106,7 @@ interface SidebarProps {
   getCurrentJSON: () => string;
 }
 
-type SidebarGroupId = "mapAtlas" | "mapLevel" | "brush" | "history" | "stats" | "grid" | "json";
+type SidebarGroupId = "mapAtlas" | "mapSettings" | "brush" | "history" | "stats" | "json";
 
 const sortTravelEventBrushes = (eventIds: string[]) => {
   return [...eventIds].sort((a, b) => a.localeCompare(b));
@@ -196,6 +198,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onMoveMap,
   mapLevel,
   onChangeMapLevel,
+  refTravelDays,
+  onChangeRefTravelDays,
   exportJSON,
   importJSON,
   terrainCounts,
@@ -207,6 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [inputRadiusInput, setInputRadiusInput] = useState<string>(String(radius));
   const [mapNameInput, setMapNameInput] = useState<string>(maps[selectedMapIndex]?.id ?? "");
   const [mapLevelInput, setMapLevelInput] = useState<string>(String(mapLevel));
+  const [refTravelDaysInput, setRefTravelDaysInput] = useState<string>(String(refTravelDays));
   const [newTravelEventInput, setNewTravelEventInput] = useState<string>("");
   const [travelEventBrushes, setTravelEventBrushes] = useState<string[]>([]);
   const [newCampTagInput, setNewCampTagInput] = useState<string>("");
@@ -214,11 +219,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [copied, setCopied] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Record<SidebarGroupId, boolean>>({
     mapAtlas: true,
-    mapLevel: true,
+    mapSettings: true,
     brush: true,
     history: true,
     stats: true,
-    grid: true,
     json: true,
   });
 
@@ -240,6 +244,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     setMapLevelInput(String(mapLevel));
   }, [mapLevel, maps, selectedMapIndex]);
+
+  useEffect(() => {
+    setRefTravelDaysInput(String(refTravelDays));
+  }, [refTravelDays, maps, selectedMapIndex]);
 
   useEffect(() => {
     setTravelEventBrushes(sortTravelEventBrushes(loadedTravelEventBrushes.eventIds));
@@ -497,74 +505,100 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </CollapsibleGroup>
 
-        {/* Custom Grid size (支援自定義格數) */}
+        {/* Map Settings */}
         <CollapsibleGroup
-          title="自定義地圖格數"
+          title="地圖設定"
           icon={<Grid className="w-3.5 h-3.5 text-slate-400" />}
-          expanded={expandedGroups.grid}
-          onToggle={() => toggleGroup("grid")}
+          expanded={expandedGroups.mapSettings}
+          onToggle={() => toggleGroup("mapSettings")}
         >
-          <div className="space-y-3">
-            <form onSubmit={handleResizeSubmit} className="flex gap-2 items-center">
-              <div className="relative flex-1">
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <label htmlFor="grid-radius-input" className="block text-xs font-semibold text-slate-600">自定義地圖格數</label>
+              <form onSubmit={handleResizeSubmit} className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <input
+                    id="grid-radius-input"
+                    type="number"
+                    min="2"
+                    max={maxGridRadius}
+                    value={inputRadiusInput}
+                    onChange={(e) => setInputRadiusInput(e.target.value)}
+                    onBlur={normalizeRadiusInput}
+                    className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">層</span>
+                </div>
+                <button
+                  id="grid-resize-btn"
+                  type="submit"
+                  className="py-1.5 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+                >
+                  調整大小
+                </button>
+              </form>
+              <div className="text-[10px] text-slate-400 leading-relaxed">
+                * 縮小半徑會裁切外圍格子，放大則會保留當前內容並往外拓展。
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="map-level-input" className="block text-xs font-semibold text-slate-600">地圖等級</label>
+              <div className="relative">
                 <input
-                  id="grid-radius-input"
+                  id="map-level-input"
+                  aria-label="地圖等級"
                   type="number"
-                  min="2"
-                  max={maxGridRadius}
-                  value={inputRadiusInput}
-                  onChange={(e) => setInputRadiusInput(e.target.value)}
-                  onBlur={normalizeRadiusInput}
+                  min="0"
+                  step="1"
+                  value={mapLevelInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMapLevelInput(value);
+                    const level = Number(value);
+                    if (value.trim() && Number.isSafeInteger(level) && level >= 0) {
+                      onChangeMapLevel(level);
+                    }
+                  }}
+                  onBlur={() => setMapLevelInput(String(mapLevel))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
                   className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">層</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">級</span>
               </div>
-              <button
-                id="grid-resize-btn"
-                type="submit"
-                className="py-1.5 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
-              >
-                調整大小
-              </button>
-            </form>
-            <div className="text-[10px] text-slate-400 leading-relaxed">
-              * 縮小半徑會裁切外圍格子，放大則會保留當前內容並往外拓展。
             </div>
-          </div>
-        </CollapsibleGroup>
-
-        {/*Map Level*/}
-        <CollapsibleGroup
-          title="地圖等級"
-          icon={<BarChart3 className="w-3.5 h-3.5 text-slate-400" />}
-          expanded={expandedGroups.mapLevel}
-          onToggle={() => toggleGroup("mapLevel")}
-        >
-          <div className="relative">
-            <input
-              id="map-level-input"
-              aria-label="地圖等級"
-              type="number"
-              min="0"
-              step="1"
-              value={mapLevelInput}
-              onChange={(e) => {
-                const value = e.target.value;
-                setMapLevelInput(value);
-                const level = Number(value);
-                if (value.trim() && Number.isSafeInteger(level) && level >= 0) {
-                  onChangeMapLevel(level);
-                }
-              }}
-              onBlur={() => setMapLevelInput(String(mapLevel))}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.currentTarget.blur();
-                }
-              }}
-              className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">級</span>
+            <div className="space-y-2">
+              <label htmlFor="ref-travel-days-input" className="block text-xs font-semibold text-slate-600">參考運輸天數</label>
+              <div className="relative">
+                <input
+                  id="ref-travel-days-input"
+                  aria-label="參考運輸天數"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={refTravelDaysInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setRefTravelDaysInput(value);
+                    const days = Number(value);
+                    if (value.trim() && Number.isFinite(days) && days >= 0) {
+                      onChangeRefTravelDays(days);
+                    }
+                  }}
+                  onBlur={() => setRefTravelDaysInput(String(refTravelDays))}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="w-full pl-3 pr-10 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 font-mono text-center focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-medium">天</span>
+              </div>
+            </div>
           </div>
         </CollapsibleGroup>
 
