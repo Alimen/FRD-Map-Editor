@@ -52,6 +52,8 @@ export interface CampLink {
 }
 
 export interface MapData {
+  level: number;
+  refTravelDays: number;
   radius: number;
   cells: Record<string, HexCell>; // Key is "q,r"
   travelEvents?: TravelEventMap; // Key is "q,r", value is event id

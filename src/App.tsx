@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { BrushLayer, CampLink, CampLinkTool, CampTagMap, Difficulty, HexCell, PaintTool, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
+import { BrushLayer, CampLink, CampLinkTool, CampTagMap, Difficulty, HexCell, MapData, PaintTool, TerrainType, LandmarkType, StyleVariant, TravelEventMap } from "./types";
 import { DEFAULT_DIFFICULTY, parseDifficulty } from "./difficulty";
 import { isLinkEndpoint, normalizeCampLinks } from "./campLinks";
 import { CampLinksOverlay } from "./components/CampLinksOverlay";
@@ -99,12 +99,8 @@ const campLandmarks = new Set<LandmarkType>([
 ]);
 const DEFAULT_CAMP_TAG = "";
 
-interface AtlasMap {
+interface AtlasMap extends MapData {
   id: string;
-  level: number;
-  refTravelDays: number;
-  radius: number;
-  cells: Record<string, HexCell>;
   travelEvents: TravelEventMap;
   campTags: CampTagMap;
   campLinks: CampLink[];
@@ -993,9 +989,9 @@ export default function App() {
     const exportCellKeys = new Set(exportCells.map((c) => `${c.q},${c.r}`));
     return {
       id: map.id,
-      level: map.level,
-      refTravelDays: map.refTravelDays,
       world: {
+        level: map.level,
+        refTravelDays: map.refTravelDays,
         radius: map.radius,
         tiles: exportCells.map((c) => ({
           c: `${c.q},${c.r}`,
@@ -1115,9 +1111,9 @@ export default function App() {
 
     return {
       id: typeof data.id === "string" && data.id.trim() ? data.id.trim() : fallbackId,
-      level: Number.isSafeInteger(data.level) && data.level >= 0 ? data.level : 0,
-      refTravelDays: typeof data.refTravelDays === "number" && Number.isFinite(data.refTravelDays) && data.refTravelDays >= 0
-        ? data.refTravelDays
+      level: Number.isSafeInteger(data.world?.level) && data.world.level >= 0 ? data.world.level : 0,
+      refTravelDays: typeof data.world?.refTravelDays === "number" && Number.isFinite(data.world.refTravelDays) && data.world.refTravelDays >= 0
+        ? data.world.refTravelDays
         : 0,
       radius: nextRadius,
       cells: nextCells,
